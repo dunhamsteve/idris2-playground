@@ -28,7 +28,7 @@ class Buffer extends DataView {
     return se;
   }
   readDoubleLE(i: number) {
-    return this.getFloat64(i, true)
+    return this.getFloat64(i, true);
   }
   readInt32LE(i: number) {
     return this.getInt32(i, true);
@@ -220,6 +220,7 @@ process.stdout.write = (s) => {
   stdout += s;
 };
 // We can't do async io, so we have to preload all of this from the web into the "filesystem"
+// TODO - this is 25MB of download, but could be a single 2.5MB zip file
 const preload = [
   "idris2-0.7.0/support/js/support.js",
   "2024103000/Prelude.ttc",
@@ -236,11 +237,144 @@ const preload = [
   "2024103000/Prelude/Num.ttc",
   "2024103000/Prelude/Basics.ttc",
   "2024103000/Prelude/EqOrd.ttc",
+  "2024103000/System.ttc",
+  "2024103000/Language/Reflection.ttc",
+  "2024103000/Language/Reflection/TT.ttc",
+  "2024103000/Language/Reflection/TTImp.ttc",
+  "2024103000/Deriving/Show.ttc",
+  "2024103000/Deriving/Functor.ttc",
+  "2024103000/Deriving/Common.ttc",
+  "2024103000/Deriving/Foldable.ttc",
+  "2024103000/Deriving/Traversable.ttc",
+  "2024103000/System/FFI.ttc",
+  "2024103000/System/Signal.ttc",
+  "2024103000/System/File.ttc",
+  "2024103000/System/Term.ttc",
+  "2024103000/System/Concurrency.ttc",
+  "2024103000/System/Errno.ttc",
+  "2024103000/System/File/Handle.ttc",
+  "2024103000/System/File/Permissions.ttc",
+  "2024103000/System/File/Meta.ttc",
+  "2024103000/System/File/Support.ttc",
+  "2024103000/System/File/Mode.ttc",
+  "2024103000/System/File/Types.ttc",
+  "2024103000/System/File/ReadWrite.ttc",
+  "2024103000/System/File/Process.ttc",
+  "2024103000/System/File/Virtual.ttc",
+  "2024103000/System/File/Error.ttc",
+  "2024103000/System/File/Buffer.ttc",
+  "2024103000/System/Info.ttc",
+  "2024103000/System/REPL.ttc",
+  "2024103000/System/Escape.ttc",
+  "2024103000/System/Directory.ttc",
+  "2024103000/System/Clock.ttc",
+  "2024103000/Syntax/WithProof.ttc",
+  "2024103000/Syntax/PreorderReasoning.ttc",
+  "2024103000/Syntax/PreorderReasoning/Ops.ttc",
+  "2024103000/Syntax/PreorderReasoning/Generic.ttc",
+  "2024103000/Decidable/Equality.ttc",
+  "2024103000/Decidable/Decidable.ttc",
+  "2024103000/Decidable/Equality/Core.ttc",
+  "2024103000/Data/Fuel.ttc",
+  "2024103000/Data/OpenUnion.ttc",
+  "2024103000/Data/Either.ttc",
+  "2024103000/Data/SortedMap.ttc",
+  "2024103000/Data/Fin/Properties.ttc",
+  "2024103000/Data/Fin/Arith.ttc",
+  "2024103000/Data/Fin/Order.ttc",
+  "2024103000/Data/Fin/Split.ttc",
+  "2024103000/Data/SortedMap/Dependent.ttc",
+  "2024103000/Data/Stream.ttc",
+  "2024103000/Data/List.ttc",
+  "2024103000/Data/Vect/AtIndex.ttc",
+  "2024103000/Data/Vect/Elem.ttc",
+  "2024103000/Data/Vect/Quantifiers.ttc",
+  "2024103000/Data/List1/Properties.ttc",
+  "2024103000/Data/List1/Elem.ttc",
+  "2024103000/Data/List1/Quantifiers.ttc",
+  "2024103000/Data/Zippable.ttc",
+  "2024103000/Data/SnocList.ttc",
+  "2024103000/Data/Bits.ttc",
+  "2024103000/Data/Bifoldable.ttc",
+  "2024103000/Data/DPair.ttc",
+  "2024103000/Data/Vect.ttc",
+  "2024103000/Data/Nat/Views.ttc",
+  "2024103000/Data/Nat/Order/Properties.ttc",
+  "2024103000/Data/Nat/Order.ttc",
+  "2024103000/Data/IOArray.ttc",
+  "2024103000/Data/IOArray/Prims.ttc",
+  "2024103000/Data/These.ttc",
+  "2024103000/Data/Morphisms.ttc",
+  "2024103000/Data/Colist.ttc",
+  "2024103000/Data/Fun.ttc",
+  "2024103000/Data/Bool.ttc",
+  "2024103000/Data/Rel.ttc",
+  "2024103000/Data/Nat.ttc",
+  "2024103000/Data/Double.ttc",
+  "2024103000/Data/Primitives/Views.ttc",
+  "2024103000/Data/Primitives/Interpolation.ttc",
+  "2024103000/Data/Singleton.ttc",
+  "2024103000/Data/SnocList/HasLength.ttc",
+  "2024103000/Data/SnocList/Elem.ttc",
+  "2024103000/Data/SnocList/Quantifiers.ttc",
+  "2024103000/Data/SnocList/Operations.ttc",
+  "2024103000/Data/Maybe.ttc",
+  "2024103000/Data/IORef.ttc",
+  "2024103000/Data/Ref.ttc",
+  "2024103000/Data/List/Views.ttc",
+  "2024103000/Data/List/HasLength.ttc",
+  "2024103000/Data/List/AtIndex.ttc",
+  "2024103000/Data/List/Lazy.ttc",
+  "2024103000/Data/List/Lazy/Quantifiers.ttc",
+  "2024103000/Data/List/Elem.ttc",
+  "2024103000/Data/List/Quantifiers.ttc",
+  "2024103000/Data/Bool/Xor.ttc",
+  "2024103000/Data/Bool/Decidable.ttc",
+  "2024103000/Data/Colist1.ttc",
+  "2024103000/Data/Fin.ttc",
+  "2024103000/Data/Contravariant.ttc",
+  "2024103000/Data/Integral.ttc",
+  "2024103000/Data/So.ttc",
+  "2024103000/Data/Void.ttc",
+  "2024103000/Data/Buffer.ttc",
+  "2024103000/Data/SortedSet.ttc",
+  "2024103000/Data/List1.ttc",
+  "2024103000/Data/String.ttc",
+  "2024103000/Control/Function.ttc",
+  "2024103000/Control/Relation/Closure.ttc",
+  "2024103000/Control/App/Console.ttc",
+  "2024103000/Control/App/FileIO.ttc",
+  "2024103000/Control/Relation.ttc",
+  "2024103000/Control/Ord.ttc",
+  "2024103000/Control/App.ttc",
+  "2024103000/Control/Order.ttc",
+  "2024103000/Control/Function/FunExt.ttc",
+  "2024103000/Control/Applicative/Const.ttc",
+  "2024103000/Control/WellFounded.ttc",
+  "2024103000/Control/Monad/Reader/Interface.ttc",
+  "2024103000/Control/Monad/Reader/Reader.ttc",
+  "2024103000/Control/Monad/ST.ttc",
+  "2024103000/Control/Monad/Partial.ttc",
+  "2024103000/Control/Monad/Either.ttc",
+  "2024103000/Control/Monad/RWS/Interface.ttc",
+  "2024103000/Control/Monad/RWS/CPS.ttc",
+  "2024103000/Control/Monad/Reader.ttc",
+  "2024103000/Control/Monad/Writer.ttc",
+  "2024103000/Control/Monad/State/Interface.ttc",
+  "2024103000/Control/Monad/State/State.ttc",
+  "2024103000/Control/Monad/Maybe.ttc",
+  "2024103000/Control/Monad/Writer/Interface.ttc",
+  "2024103000/Control/Monad/Writer/CPS.ttc",
+  "2024103000/Control/Monad/State.ttc",
+  "2024103000/Control/Monad/RWS.ttc",
+  "2024103000/Control/Monad/Error/Interface.ttc",
+  "2024103000/Control/Monad/Error/Either.ttc",
+  "2024103000/Control/Monad/Trans.ttc",
+  "2024103000/Control/Monad/Identity.ttc",
+  "2024103000/Debug/Trace.ttc",
 ];
 
-function doBuild(src: string) {
-  
-}
+function doBuild(src: string) {}
 
 onmessage = async function (ev) {
   console.log("message", ev);
@@ -258,9 +392,9 @@ onmessage = async function (ev) {
     }
   }
   console.log("preload done");
-  
+
   let module = "Main";
-  let {src} = ev.data
+  let { src } = ev.data;
   let m = src.match(/module (\w+)/);
   if (m) module = m[1];
   let fn = `${module}.idr`;
@@ -284,6 +418,5 @@ onmessage = async function (ev) {
   let javascript = new TextDecoder().decode(files["build/exec/out.js"]);
   let output = stdout;
   postMessage({ javascript, output, duration });
-  
 };
 importScripts("idris2.js");
