@@ -180,7 +180,11 @@ function Tabs() {
   );
 }
 
-const SAMPLES = ["Main.idr"];
+const SAMPLES = [
+  "Main.idr",
+  "BTree.idr",
+  "Interp.idr",
+];
 
 function EditWrap({
   vertical,
