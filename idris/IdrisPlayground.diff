@@ -1,0 +1,87 @@
+diff --git a/src/Idris/Driver.idr b/src/Idris/Driver.idr
+index 40d9ced55..f2dcf2f71 100644
+--- a/src/Idris/Driver.idr
++++ b/src/Idris/Driver.idr
+@@ -202,31 +202,9 @@ stMain cgs opts
+ 
+                  doRepl <- catch (postOptions result opts)
+                                  (\err => emitError err *> pure False)
+-                 if doRepl then
+-                   if ide || ideSocket then
+-                     if not ideSocket
+-                      then do
+-                       setOutput (IDEMode 0 stdin stdout)
+-                       replIDE {c} {u} {m}
+-                     else do
+-                       let (host, port) = ideSocketModeAddress opts
+-                       f <- coreLift $ initIDESocketFile host port
+-                       case f of
+-                         Left err => do
+-                           coreLift $ putStrLn err
+-                           coreLift $ exitWith (ExitFailure 1)
+-                         Right file => do
+-                           setOutput (IDEMode 0 file file)
+-                           replIDE {c} {u} {m}
+-                   else do
+-                       repl {c} {u} {m}
+-                       showTimeRecord
+-                  else
+-                      -- exit with an error code if there was an error, otherwise
+-                      -- just exit
+-                    do ropts <- get ROpts
+-                       showTimeRecord
+-                       whenJust (errorLine ropts) $ \ _ =>
++                 ropts <- get ROpts
++                 showTimeRecord
++                 whenJust (errorLine ropts) $ \ _ =>
+                          coreLift $ exitWith (ExitFailure 1)
+ 
+   where
+diff --git a/src/Idris/Main.idr b/src/Idris/Main.idr
+index 9fb7bd833..00e228172 100644
+--- a/src/Idris/Main.idr
++++ b/src/Idris/Main.idr
+@@ -3,5 +3,16 @@ module Idris.Main
+ import Idris.Driver
+ import Compiler.Common
+ 
++import System.File
++import System.Errno
++import System.Term
++
++-- This will be needed when we add REPL
++-- %foreign_impl prim__readChar "javascript:lambda:() => -1"
++%foreign_impl prim__flush "javascript:lambda:() => undefined"
++%foreign_impl prim__getErrno "javascript:lambda:() => process.errno"
++%foreign_impl prim__setupTerm "javascript:lambda:() => {}"
++%foreign_impl prim__getTermCols "javascript:lambda:() => 80"
++
+ main : IO ()
+ main = mainWithCodegens []
+diff --git a/src/Idris/REPL.idr b/src/Idris/REPL.idr
+index f5c5f4a21..14e771432 100644
+--- a/src/Idris/REPL.idr
++++ b/src/Idris/REPL.idr
+@@ -22,8 +22,6 @@ import Core.Termination
+ import Core.Unify
+ import Core.Value
+ 
+-import Core.SchemeEval
+-
+ import Parser.Unlit
+ 
+ import Idris.Desugar
+@@ -888,13 +886,6 @@ process (Eval itm)
+          let emode = evalMode opts
+          case emode of
+             Execute => do ignore (execExp itm); pure (Executed itm)
+-            Scheme =>
+-              do (tm `WithType` ty) <- inferAndElab InExpr itm []
+-                 qtm <- logTimeWhen !getEvalTiming 0 "Evaluation" $
+-                           (do nf <- snfAll [] tm
+-                               quote [] nf)
+-                 itm <- logTimeWhen False 0 "Resugar" $ resugar [] qtm
+-                 pure (Evaluated itm Nothing)
+             _ =>
+               do (ntm `WithType` ty) <- logTimeWhen !getEvalTiming 0 "Evaluation" $
+                                            inferAndNormalize emode itm

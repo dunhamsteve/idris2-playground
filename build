@@ -1,0 +1,13 @@
+#!/bin/sh
+echo build monaco worker
+esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
+echo build worker
+esbuild src/worker.ts > public/worker.js
+cp -r samples/* public
+cp -r idris/2024103000 public
+(
+    echo "let __mainExpression_0=(function(){"
+    cat idris/idris2.js
+    echo "return __mainExpression_0})()"
+) |grep -v '^#' | grep -v 'try{__mainExpression_0' > idris/idris2.edit.js
+esbuild --minify idris/idris2.edit.js > public/idris2.js

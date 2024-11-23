@@ -1,0 +1,72 @@
+#app {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  position: absolute;
+}
+#editor {
+  height: 100%;
+}
+.wrapper.horizontal {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+}
+.wrapper.horizontal > div {
+  flex: 1 1;
+  /* allow smaller than natural */
+  width: 100px;
+}
+.wrapper.vertical {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.wrapper.vertical .tabPanel.left {
+  /* designed to go down to the keyboard on my phone */
+  flex: .65 .65;
+  height: 100px;
+}
+.wrapper.vertical .tabPanel.right {
+  flex: .35 .35;
+  height: 100px;
+}
+.tabBar button {
+  border: none;
+  padding: none;
+  background: inherit;
+}
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+}
+.tabBar {
+  display:flex;
+  flex-direction: row;
+  gap: 10px;
+  margin: 10px 0 0 0;
+  border-bottom: solid 1px black;
+  height: 30px;
+}
+.tabBar>select {
+  margin: 0 5px 5px;
+}
+.tab {
+  padding: 4px;
+  border: solid 1px transparent;
+}
+.tab.selected {
+  border: solid 1px black;
+  border-bottom: 0px
+}
+.tabBody {
+  overflow: auto;
+  flex: 1 1;
+}
+#result, #javascript {
+  font-family: 'Comic Code', monospace;
+  font-size: 12px;
+  white-space: pre;
+  padding: 5px;
+}
