@@ -48,8 +48,9 @@ fact = Lam (If (Op (==) (Var Stop) (Val 0))
                (Op (*) (App fact (Op (-) (Var Stop) (Val 1)))
                        (Var Stop)))
 
+%foreign_impl prim__getStr "javascript:lambda:() => prompt()"
+
 main : IO ()
 main = do putStr "Enter a number: "
-        --   x <- getLine
-          let x = 10
+          x <- getLine
           printLn (interp [] fact (cast x))
