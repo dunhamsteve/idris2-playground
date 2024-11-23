@@ -70,7 +70,7 @@ document.addEventListener("keydown", (ev) => {
 
 const LOADING = "module Loading\n";
 
-let value = localStorage.code || LOADING;
+let value = localStorage.idrisCode || LOADING;
 let initialVertical = localStorage.vertical == "true";
 
 // let result = document.getElementById("result")!;
@@ -107,7 +107,7 @@ function Editor({ initialValue }: EditorProps) {
       timeout = setTimeout(() => {
         let value = editor.getValue();
         build(value);
-        localStorage.code = value;
+        localStorage.idrisCode = value;
       }, 1000);
     });
     if (initialValue === LOADING) loadFile("Main.idr");
