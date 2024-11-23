@@ -34,7 +34,6 @@ class Buffer extends DataView {
     return this.getInt32(i, true);
   }
   writeInt32LE(val: number, i: number) {
-    console.log("wi32", i, val);
     return this.setInt32(i, val, true);
   }
   copy(target: Buffer, ts: number, ss: number, se: number) {
@@ -77,6 +76,7 @@ let shim: any = {
     },
   },
   fs: {
+    // TODO - Idris is doing readdir, we should implement that
     opendirSync(name: string) {
       let fd = fds.findIndex((x) => !x);
       if (fd < 0) fd = fds.length;
@@ -100,7 +100,6 @@ let shim: any = {
       if (mode == "w") {
         buf = new Uint8Array(0);
       } else {
-        console.log(name, !!files[name]);
         if (!files[name]) {
           process.errno = 1;
           throw new Error(`${name} not found`);
@@ -116,7 +115,6 @@ let shim: any = {
       try {
         let handle = fds[fd];
         if (!handle) throw new Error(`bad fd ${fd}`);
-        console.log("writeSync", handle.name);
 
         let buf2: ArrayBuffer;
         if (typeof line === "string") {
@@ -148,7 +146,6 @@ let shim: any = {
     chmodSync(fn: string, mode: number) {},
     fstatSync(fd: number) {
       let hand = fds[fd];
-      console.log("size", hand.buf.byteLength);
       return { size: hand.buf.byteLength };
     },
     readSync(fd: number, buf: Buffer, start: number, len: number) {
@@ -162,7 +159,7 @@ let shim: any = {
     },
     closeSync(fd: number) {
       let handle = fds[fd];
-      console.log("close", handle.name);
+      // console.log("close", handle.name);
       if (handle.mode == "w") {
         files[handle.name] = handle.buf;
       }
@@ -206,10 +203,8 @@ const process: Process = {
   // stdin: { fd: 0 },
 };
 
-const require = (x: string) => {
-  console.log("require", x);
-  return shim[x];
-};
+// This is referenced by Idris
+const require = (x: string) => shim[x];
 
 // Maybe the shim goes here and we append newt...
 
@@ -399,7 +394,7 @@ onmessage = async function (ev) {
   if (m) module = m[1];
   let fn = `${module}.idr`;
   process.argv = ["foo", "bar", "-c", fn, "-o", "out.js"];
-  console.log("args", process.argv);
+  console.log("Using args", process.argv);
   files[fn] = new TextEncoder().encode(src);
   files["build/exec/out.js"] = new TextEncoder().encode("No JS output");
   stdout = "";
