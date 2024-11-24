@@ -4,8 +4,7 @@ esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > pub
 echo build worker
 esbuild src/worker.ts > public/worker.js
 cp -r samples/* public
-cp -r idris/2024103000 public
-cp -r idris/idris2-0.7.0 public
+cp idris/files.zip public
 (
     echo "let __mainExpression_0=(function(){"
     cat idris/idris2.js
