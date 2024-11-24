@@ -2,10 +2,8 @@ import * as monaco from "monaco-editor";
 
 export let idrisConfig: monaco.languages.LanguageConfiguration = {
   comments: {
-    // symbol used for single line comment. Remove this entry if your language does not support line comments
     lineComment: "--",
-    // symbols used for start and end a block comment. Remove this entry if your language does not support block comments
-    blockComment: ["/-", "-/"],
+    blockComment: ["{-", "-}"],
   },
   // symbols used as brackets
   brackets: [
@@ -20,7 +18,7 @@ export let idrisConfig: monaco.languages.LanguageConfiguration = {
     { open: "(", close: ")" },
     { open: '"', close: '"' },
     { open: "'", close: "'" },
-    { open: "/-", close: "-/" },
+    { open: "{-", close: "-}" },
   ],
   // symbols that can be used to surround a selection
   surroundingPairs: [
@@ -50,8 +48,8 @@ export let idrisConfig: monaco.languages.LanguageConfiguration = {
       },
     },
     {
-      beforeText: /\/-/,
-      afterText: /-\//,
+      beforeText: /\{-/,
+      afterText: /-\}/,
       action: {
         indentAction: monaco.languages.IndentAction.IndentOutdent,
       },
@@ -64,27 +62,43 @@ export let idrisTokens: monaco.languages.IMonarchLanguage = {
   // defaultToken: "invalid",
 
   keywords: [
+    "module",
+    "import",
+    "mutual",
+    "namespace",
     "let",
     "in",
+    "do",
+    "export",
+    "public",
+    "rewrite",
     "where",
     "case",
     "of",
     "data",
+    "record",
+    "covering",
+    "partial",
+    "failing",
+    "total",
+    "constructor",
+    "parameters",
+    "default",
+    "using",
+    "with",
+    "impossible",
     "forall",
-    "∀",
-    "U",
     "module",
-    "ptype",
-    "pfunc",
     "if",
     "then",
     "else",
-    "class",
-    "instance",
-    "module",
+    "interface",
+    "implementation",
     "infixl",
     "infixr",
     "infix",
+    "auto",
+    "prefix",
   ],
   specialOps: ["=>", "->", ":", "=", ":="],
   tokenizer: {
