@@ -1,3 +1,54 @@
+// Worker to run idris on source code
+
+onmessage = async function (ev) {
+  console.log("message", ev);
+  if (!archive) {
+    // We pull down an archive of .ttc and support files
+    try {
+      let res = await this.fetch("files.zip");
+      if (res.status === 200) {
+        let data = await res.arrayBuffer();
+        archive = new ZipFile(new Uint8Array(data));
+        console.log("preload done");
+      } else {
+        console.error(
+          `fetch of files.zip got status ${res.status}: ${res.statusText}`
+        );
+      }
+    } catch (e) {
+      console.error("preload failed", e);
+    }
+  }
+
+  let module = "Main";
+  let { src } = ev.data;
+  let m = src.match(/module (\w+)/);
+  if (m) module = m[1];
+  let fn = `${module}.idr`;
+  process.argv = ["foo", "bar", "-c", fn, "-o", "out.js"];
+  console.log("Using args", process.argv);
+  files[fn] = new TextEncoder().encode(src);
+  files["build/exec/out.js"] = new TextEncoder().encode("No JS output");
+  stdout = "";
+  const start = +new Date();
+  try {
+    __mainExpression_0();
+  } catch (e) {
+    console.log("catch", e);
+    // make it clickable in console
+    console.error(e);
+    // make it visable on page
+    stdout += "\n" + String(e);
+  }
+  let duration = +new Date() - start;
+  console.log(`process ${fn} in ${duration} ms`);
+  let javascript = new TextDecoder().decode(files["build/exec/out.js"]);
+  let output = stdout;
+  postMessage({ javascript, output, duration });
+};
+
+// *** Zip implementation
+
 // I wrote this inflate years ago, seems to work for zip
 class BitReader {
   pos = 0;
@@ -259,6 +310,51 @@ function inflate(input: Uint8Array) {
   return out.slice(0, pos);
 }
 
+interface Entry {
+  size: number;
+  start: number;
+  end: number;
+}
+
+class ZipFile {
+  data: Uint8Array;
+  entries: Record<string, Entry>;
+  constructor(data: Uint8Array) {
+    this.data = data;
+    this.entries = {};
+    let td = new TextDecoder();
+    let error = (msg: string) => {
+      throw new Error(`${msg} at ${pos}`);
+    };
+
+    let view = new DataView(data.buffer);
+    let pos = 0;
+    while (pos < view.byteLength) {
+      let sig = view.getUint32(pos, true);
+      if (sig == 0x02014b50) break;
+      if (sig != 0x04034b50) error(`bad sig ${sig.toString(16)}`);
+      let method = view.getUint16(pos + 8, true);
+      let csize = view.getUint32(pos + 18, true);
+      let size = view.getUint32(pos + 22, true);
+      let fnlen = view.getUint16(pos + 26, true);
+      let eflen = view.getUint16(pos + 28, true);
+      let fn = td.decode(data.slice(pos + 30, pos + 30 + fnlen));
+      if (size) {
+        let start = pos + 30 + fnlen + eflen;
+        let end = start + csize;
+        this.entries[fn] = { size, start, end };
+      }
+      pos = pos + 30 + fnlen + eflen + csize;
+    }
+  }
+  getData(name: string) {
+    let { start, end, size } = this.entries[name];
+    return inflate(new Uint8Array(this.data.slice(start, end)));
+  }
+}
+
+// *** node library emulation
+
 class Buffer extends DataView {
   static alloc(n: number) {
     return new Buffer(new Uint8Array(n).buffer);
@@ -313,49 +409,6 @@ class Buffer extends DataView {
   }
   toString() {
     return new TextDecoder().decode(this);
-  }
-}
-
-interface Entry {
-  size: number;
-  start: number;
-  end: number;
-}
-
-class ZipFile {
-  data: Uint8Array;
-  entries: Record<string, Entry>;
-  constructor(data: Uint8Array) {
-    this.data = data;
-    this.entries = {};
-    let td = new TextDecoder();
-    let error = (msg: string) => {
-      throw new Error(`${msg} at ${pos}`);
-    };
-
-    let view = new DataView(data.buffer);
-    let pos = 0;
-    while (pos < view.byteLength) {
-      let sig = view.getUint32(pos, true);
-      if (sig == 0x02014b50) break;
-      if (sig != 0x04034b50) error(`bad sig ${sig.toString(16)}`);
-      let method = view.getUint16(pos + 8, true);
-      let csize = view.getUint32(pos + 18, true);
-      let size = view.getUint32(pos + 22, true);
-      let fnlen = view.getUint16(pos + 26, true);
-      let eflen = view.getUint16(pos + 28, true);
-      let fn = td.decode(data.slice(pos + 30, pos + 30 + fnlen));
-      if (size) {
-        let start = pos + 30 + fnlen + eflen;
-        let end = start + csize;
-        this.entries[fn] = { size, start, end };
-      }
-      pos = pos + 30 + fnlen + eflen + csize;
-    }
-  }
-  getData(name: string) {
-    let { start, end, size } = this.entries[name];
-    return inflate(new Uint8Array(this.data.slice(start, end)));
   }
 }
 
@@ -490,12 +543,16 @@ shim.fs = new Proxy(shim.fs, {
   },
 });
 
+let stdout = ''
 const process: Process = {
   platform: "linux",
   argv: ["", ""],
   stdout: {
     // We'll want to replace this one
-    write: console.log,
+    write(s) {
+      console.log("*", s);
+      stdout += s;
+    }
   },
   exit(v: number) {
     console.log("exit", v);
@@ -515,59 +572,5 @@ const process: Process = {
 // This is referenced by Idris
 const require = (x: string) => shim[x];
 
-// Maybe the shim goes here and we append newt...
-
-let stdout = "";
-// We'll want to collect and put info in the monaco
-process.stdout.write = (s) => {
-  console.log("*", s);
-  stdout += s;
-};
-
-onmessage = async function (ev) {
-  console.log("message", ev);
-  if (!archive) {
-    // We pull down an archive of .ttc and support files
-    try {
-      let res = await this.fetch("files.zip");
-      if (res.status === 200) {
-        let data = await res.arrayBuffer();
-        archive = new ZipFile(new Uint8Array(data));
-        console.log("preload done");
-      } else {
-        console.error(
-          `fetch of files.zip got status ${res.status}: ${res.statusText}`
-        );
-      }
-    } catch (e) {
-      console.error("preload failed", e);
-    }
-  }
-
-  let module = "Main";
-  let { src } = ev.data;
-  let m = src.match(/module (\w+)/);
-  if (m) module = m[1];
-  let fn = `${module}.idr`;
-  process.argv = ["foo", "bar", "-c", fn, "-o", "out.js"];
-  console.log("Using args", process.argv);
-  files[fn] = new TextEncoder().encode(src);
-  files["build/exec/out.js"] = new TextEncoder().encode("No JS output");
-  stdout = "";
-  const start = +new Date();
-  try {
-    __mainExpression_0();
-  } catch (e) {
-    console.log("catch", e);
-    // make it clickable in console
-    console.error(e);
-    // make it visable on page
-    stdout += "\n" + String(e);
-  }
-  let duration = +new Date() - start;
-  console.log(`process ${fn} in ${duration} ms`);
-  let javascript = new TextDecoder().decode(files["build/exec/out.js"]);
-  let output = stdout;
-  postMessage({ javascript, output, duration });
-};
+// *** Load idris
 importScripts("idris2.js");
