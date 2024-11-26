@@ -21,7 +21,7 @@ function build(src: string) {
 }
 
 function runOutput() {
-  const src = state.javascript.value
+  const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
     iframe.contentWindow?.postMessage({ cmd: "exec", src }, "*");
@@ -31,8 +31,7 @@ function runOutput() {
 }
 window.onmessage = (ev) => {
   console.log("window got", ev.data);
-  if (ev.data.messages)
-    state.messages.value = ev.data.messages;
+  if (ev.data.messages) state.messages.value = ev.data.messages;
 };
 idrisWorker.onmessage = (ev) => {
   state.output.value = ev.data.output;
@@ -53,6 +52,23 @@ const state = {
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
 };
 window.state = state;
+
+if (window.matchMedia) {
+  function checkDark(ev: { matches: boolean }) {
+    console.log("CHANGE", ev);
+    if (ev.matches) {
+      monaco.editor.setTheme("vs-dark");
+      document.body.className = "dark";
+    } else {
+      monaco.editor.setTheme("vs");
+      document.body.className = "light";
+    }
+  }
+  let query = window.matchMedia("(prefers-color-scheme: dark)");
+  query.addEventListener("change", checkDark);
+  checkDark(query);
+}
+
 async function loadFile(fn: string) {
   if (fn) {
     const res = await fetch(fn);
@@ -93,7 +109,6 @@ function Editor({ initialValue }: EditorProps) {
     const editor = monaco.editor.create(container, {
       value,
       language: "idris",
-      theme: "vs",
       fontFamily: "Comic Code, Menlo, Monaco, Courier New, sans",
       automaticLayout: true,
       acceptSuggestionOnEnter: "off",
@@ -129,7 +144,7 @@ function Result() {
 }
 
 function Console() {
-  const messages = state.messages.value ?? []
+  const messages = state.messages.value ?? [];
   return h(
     "div",
     { id: "console" },
@@ -146,16 +161,16 @@ function Tabs() {
   const Tab = (label: string) => {
     let onClick = () => {
       setSelected(label);
-      localStorage.tab = label
-    }
+      localStorage.tab = label;
+    };
     let className = "tab";
     if (label == selected) className += " selected";
     return h("div", { className, onClick }, label);
   };
 
   useEffect(() => {
-    if (state.messages.value) setSelected(CONSOLE)
-  }, [state.messages.value])
+    if (state.messages.value) setSelected(CONSOLE);
+  }, [state.messages.value]);
 
   let body;
   switch (selected) {
@@ -175,16 +190,18 @@ function Tabs() {
   return h(
     "div",
     { className: "tabPanel right" },
-    h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT), Tab(CONSOLE)),
+    h(
+      "div",
+      { className: "tabBar" },
+      Tab(RESULTS),
+      Tab(JAVASCRIPT),
+      Tab(CONSOLE)
+    ),
     h("div", { className: "tabBody" }, body)
   );
 }
 
-const SAMPLES = [
-  "Main.idr",
-  "BTree.idr",
-  "Interp.idr",
-];
+const SAMPLES = ["Main.idr", "BTree.idr", "Interp.idr"];
 
 function EditWrap({
   vertical,
@@ -202,6 +219,9 @@ function EditWrap({
       loadFile(fn);
     }
   };
+  let play = "M0 0 L20 10 L0 20 z";
+  let svg = (d: string) =>
+    h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
   let d = vertical
     ? "M0 0 h20 v20 h-20 z M0 10 h20"
     : "M0 0 h20 v20 h-20 z M10 0 v20";
@@ -218,19 +238,14 @@ function EditWrap({
         options
       ),
       h("div", { style: { flex: "1 1" } }),
-      h("button", { onClick: runOutput
-       }, "⏵"),
-      h(
-        "button",
-        { onClick: toggle },
-        h(
-          "svg",
-          { width: 20, height: 20 },
-          h("path", { d, fill: "none", stroke: "black" })
-        )
-      )
+      h("button", { onClick: runOutput }, svg(play)),
+      h("button", { onClick: toggle }, svg(d))
     ),
-    h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
+    h(
+      "div",
+      { className: "tabBody editor" },
+      h(Editor, { initialValue: value })
+    )
   );
 }
 
@@ -251,7 +266,7 @@ function App() {
 
 render(h(App, {}), document.getElementById("app")!);
 
-let timeout: number | undefined;
+let timeout: any;
 
 // Adapted from the vscode extension, but types are slightly different
 // and positions are 1-based.
@@ -267,7 +282,7 @@ const processOutput = (
     let line = lines[i];
 
     if (line.match(/^Error: .*/)) {
-      while (lines[i+1]) line = line + ' ' + lines[++i]
+      while (lines[i + 1]) line = line + " " + lines[++i];
       error = ["ERROR", line];
     }
     // Foo:4:25--4:29

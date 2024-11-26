@@ -85,6 +85,7 @@ export let idrisTokens: monaco.languages.IMonarchLanguage = {
     "parameters",
     "default",
     "using",
+    "private",
     "with",
     "impossible",
     "forall",
@@ -100,7 +101,7 @@ export let idrisTokens: monaco.languages.IMonarchLanguage = {
     "auto",
     "prefix",
   ],
-  specialOps: ["=>", "->", ":", "=", ":="],
+  specialOps: ["=>", "->", ":", "=", ":=", "<-"],
   tokenizer: {
     root: [
       [

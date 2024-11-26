@@ -1,3 +1,20 @@
+
+svg.icon path {
+  stroke: black;
+  fill: none;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+    color: white;
+    background-color: black;
+  }
+  svg.icon path {
+    stroke: white;
+    fill: none;
+  }
+}
+
 #app {
   top: 0;
   bottom: 0;
@@ -63,6 +80,9 @@
 .tabBody {
   overflow: auto;
   flex: 1 1;
+}
+.horizontal .tabBody.editor {
+  overflow: unset;
 }
 #result, #javascript {
   font-family: 'Comic Code', monospace;
