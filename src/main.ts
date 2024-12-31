@@ -4,6 +4,7 @@ import * as monaco from "monaco-editor";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
+import { CompileRes } from "./types.ts";
 
 monaco.languages.register({ id: "idris" });
 monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
@@ -33,7 +34,8 @@ window.onmessage = (ev) => {
   console.log("window got", ev.data);
   if (ev.data.messages) state.messages.value = ev.data.messages;
 };
-idrisWorker.onmessage = (ev) => {
+idrisWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
+  state.result.value = ev.data
   state.output.value = ev.data.output;
   state.javascript.value = ev.data.javascript;
 };
@@ -46,6 +48,7 @@ self.MonacoEnvironment = {
 };
 
 const state = {
+  result: signal<CompileRes|null>(null),
   output: signal(""),
   javascript: signal(""),
   messages: signal<string[]>([]),
@@ -88,8 +91,6 @@ const LOADING = "module Loading\n";
 
 let value = localStorage.idrisCode || LOADING;
 let initialVertical = localStorage.vertical == "true";
-
-// let result = document.getElementById("result")!;
 
 // the editor might handle this itself with the right prodding.
 effect(() => {
@@ -138,9 +139,9 @@ function JavaScript() {
   return h("div", { id: "javascript" }, text);
 }
 
-function Result() {
-  const text = state.output.value;
-  return h("div", { id: "result" }, text);
+function Result({field}: {field : keyof CompileRes}) {
+  const text = state.result.value?.[field];
+  return h("div", { id: field }, text);
 }
 
 function Console() {
@@ -155,6 +156,7 @@ function Console() {
 const RESULTS = "Output";
 const JAVASCRIPT = "JS";
 const CONSOLE = "Console";
+const CASES = "Case Trees";
 
 function Tabs() {
   const [selected, setSelected] = useState(localStorage.tab ?? RESULTS);
@@ -175,13 +177,16 @@ function Tabs() {
   let body;
   switch (selected) {
     case RESULTS:
-      body = h(Result, {});
+      body = h(Result, {field:'output'});
       break;
     case JAVASCRIPT:
       body = h(JavaScript, {});
       break;
     case CONSOLE:
       body = h(Console, {});
+      break;
+    case CASES:
+      body = h(Result, {field:'cases'});
       break;
     default:
       body = h("div", {});
@@ -195,7 +200,8 @@ function Tabs() {
       { className: "tabBar" },
       Tab(RESULTS),
       Tab(JAVASCRIPT),
-      Tab(CONSOLE)
+      Tab(CONSOLE),
+      Tab(CASES),
     ),
     h("div", { className: "tabBody" }, body)
   );

@@ -1,8 +1,8 @@
 #!/bin/sh
 echo build monaco worker
 esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
-echo build worker
-esbuild src/worker.ts > public/worker.js
+echo build idris worker
+esbuild src/worker.ts --bundle --format=esm > public/worker.js
 cp -r samples/* public
 cp idris/files.zip public
 (
