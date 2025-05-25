@@ -84,9 +84,13 @@ svg.icon path {
 .horizontal .tabBody.editor {
   overflow: unset;
 }
-#result, #javascript {
+#result, #javascript, #output, #cases {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
   padding: 5px;
+}
+/* Do we want to wrap? */
+#cases {
+  white-space: pre-wrap;
 }
