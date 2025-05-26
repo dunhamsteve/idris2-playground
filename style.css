@@ -4,6 +4,24 @@ svg.icon path {
   fill: none;
 }
 
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 50px;
+  width: auto;
+  z-index: 100;
+  background: white;
+}
+
+.toast div {
+  margin-left: -50%;
+  border: solid 2px darkgrey;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  text-align: center;
+}
+
 @media (prefers-color-scheme: dark) {
 	body {
     color: white;
@@ -12,6 +30,10 @@ svg.icon path {
   svg.icon path {
     stroke: white;
     fill: none;
+  }
+  .toast, .toast div {
+    background: black;
+    color: white;
   }
 }
 

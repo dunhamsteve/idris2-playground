@@ -5,6 +5,9 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { CompileRes } from "./types.ts";
+import { b64decode, b64encode } from "./base64.ts";
+import { deflate } from "./deflate.ts";
+import { inflate } from "./inflate.ts";
 
 monaco.languages.register({ id: "idris" });
 monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
@@ -53,6 +56,7 @@ const state = {
   javascript: signal(""),
   messages: signal<string[]>([]),
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
+  toast: signal(""),
 };
 window.state = state;
 
@@ -77,19 +81,37 @@ async function loadFile(fn: string) {
     const res = await fetch(fn);
     const text = await res.text();
     state.editor.value!.setValue(text);
-  } else {
-    state.editor.value!.setValue("module Main\n");
   }
 }
 
-// I keep pressing save.
-document.addEventListener("keydown", (ev) => {
-  if (ev.metaKey && ev.code == "KeyS") ev.preventDefault();
+document.addEventListener("keydown", async (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS") {
+    ev.preventDefault();
+    let src = state.editor.value!.getValue()
+    let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`
+    window.location.hash = hash;
+    await navigator.clipboard.writeText(window.location.href)
+    state.toast.value = "URL copied to clipboard"
+    setTimeout(() => (state.toast.value = ''), 2_000)
+  }
 });
+
+function getSavedCode() {
+  let value: string = localStorage.idrisCode || LOADING;
+  let hash = window.location.hash
+  if (hash.startsWith("#code/")) {
+    try {
+      value = new TextDecoder().decode(inflate(b64decode(hash.slice(6))))
+    } catch (e) {
+      console.error(e)
+    }
+  }
+  return value
+}
 
 const LOADING = "module Loading\n";
 
-let value = localStorage.idrisCode || LOADING;
+let value = getSavedCode();
 let initialVertical = localStorage.vertical == "true";
 
 // the editor might handle this itself with the right prodding.
@@ -262,9 +284,14 @@ function App() {
     localStorage.vertical = !vertical;
   };
   let className = `wrapper ${vertical ? "vertical" : "horizontal"}`;
+  let toast
+  if (state.toast.value) {
+    toast = h('p', {className: 'toast'},h('div', {}, state.toast.value))
+  }
   return h(
     "div",
     { className },
+    toast,
     h(EditWrap, { vertical, toggle }),
     h(Tabs, {})
   );
@@ -274,8 +301,6 @@ render(h(App, {}), document.getElementById("app")!);
 
 let timeout: any;
 
-// Adapted from the vscode extension, but types are slightly different
-// and positions are 1-based.
 const processOutput = (
   editor: monaco.editor.IStandaloneCodeEditor,
   output: string
