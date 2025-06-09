@@ -5,6 +5,7 @@ interface Entry {
   size: number;
   start: number;
   end: number;
+  method: number;
 }
 
 export class ZipFile {
@@ -25,7 +26,6 @@ export class ZipFile {
       if (sig == 0x02014b50) break;
       if (sig != 0x04034b50) error(`bad sig ${sig.toString(16)}`);
       let method = view.getUint16(pos + 8, true);
-      console.log('METHOD', method)
       let csize = view.getUint32(pos + 18, true);
       let size = view.getUint32(pos + 22, true);
       let fnlen = view.getUint16(pos + 26, true);
@@ -34,7 +34,7 @@ export class ZipFile {
       if (size) {
         let start = pos + 30 + fnlen + eflen;
         let end = start + csize;
-        this.entries[fn] = { size, start, end };
+        this.entries[fn] = { size, start, end, method };
       }
       pos = pos + 30 + fnlen + eflen + csize;
     }

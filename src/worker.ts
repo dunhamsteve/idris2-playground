@@ -3,11 +3,8 @@ import { shim } from "./emul";
 import { archive, preload } from "./preload";
 import { CompileReq, CompileRes } from "./types";
 
-const handleMessage = async function (ev: { data: CompileReq }) {
-  console.log("message", ev.data);
-  await preload;
-  shim.archive = archive
-  let { src } = ev.data;
+function doCompile(data: CompileReq) {
+  let { id, src } = data;
   let module = "Main";
   let m = src.match(/module (\w+)/);
   if (m) module = m[1];
@@ -33,7 +30,48 @@ const handleMessage = async function (ev: { data: CompileReq }) {
   let javascript = new TextDecoder().decode(shim.files[outfile]);
   let cases = shim.files['cases.out'] ? new TextDecoder().decode(shim.files['cases.out']) : '';
   let output = shim.stdout;
-  sendResponse({ cases, javascript, output, duration });
+  sendResponse({ cases, javascript, output, duration, id });
+}
+
+function doSave(data: CompileReq) {
+  let {id, src} = data
+  let module = "Main";
+  let m = src.match(/module (\w+)/);
+  if (m) module = m[1];
+  let fn = `${module}.idr`;
+  shim.files[fn] = new TextEncoder().encode(src)
+  let resp: any = {id, output: fn}
+  console.log('resp', resp)
+  sendResponse(resp)
+}
+
+let initialized = false
+function doRepl(data: CompileReq) {
+  shim.stdout = ''
+  if (!initialized) {
+    // this runs too early at startup
+    process.argv = ["", "", "--dumpcases", "cases.out"];
+    __mainExpression_0()
+    initialized = true
+    console.log(shim.stdout)
+  }
+  let {src,id} = data
+  let start = +new Date()
+  let res = runCommand(src)
+  let duration = +new Date() - start;
+  console.log(src, '->', res)
+  let output = shim.stdout
+  sendResponse({id, output, javascript: '', duration, cases:''})
+}
+
+const handleMessage = async function (ev: { data: CompileReq }) {
+  console.log("message", ev.data);
+  await preload;
+  console.log('dispatch')
+  shim.archive = archive
+  if (ev.data.cmd === 'build') doCompile(ev.data)
+  if (ev.data.cmd === 'repl') doRepl(ev.data)
+  if (ev.data.cmd === 'save') doSave(ev.data)
 };
 
 // hooks for worker.html to override

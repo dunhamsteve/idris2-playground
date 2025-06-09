@@ -68,6 +68,7 @@ interface Process {
   platform: string;
   stdout: {
     write(s: string): void;
+    columns: number;
   };
   argv: string[];
   exit(_: number): void;
@@ -80,7 +81,7 @@ export interface NodeShim {
   archive?: ZipFile;
   process: Process;
   files: Record<string, Uint8Array>;
-  fds: Handle[];
+  fds: (Handle|string)[];
   tty: {
     isatty(): number;
   };
@@ -94,7 +95,7 @@ export let shim: NodeShim = {
   archive: undefined,
   stdout: "",
   files: {},
-  fds: [],
+  fds: ["stdin", "stdout", "stderr"],
   tty: {
     isatty() {
       return 0;
@@ -150,7 +151,11 @@ export let shim: NodeShim = {
       try {
         let handle = shim.fds[fd];
         if (!handle) throw new Error(`bad fd ${fd}`);
-
+        if (typeof handle === 'string') {
+          console.log('WRITE', handle, JSON.stringify(line))
+          shim.stdout += line
+          return
+        }
         let buf2: ArrayBuffer;
         if (typeof line === "string") {
           buf2 = new TextEncoder().encode(line);
@@ -174,7 +179,7 @@ export let shim: NodeShim = {
           throw new Error(`write ${typeof line} not implemented`);
         }
       } catch (e) {
-        debugger;
+        // debugger;
         throw e;
       }
     },
@@ -182,6 +187,13 @@ export let shim: NodeShim = {
     fstatSync(fd: number) {
       let hand = shim.fds[fd];
       return { size: hand.buf.byteLength };
+    },
+    statSync(fn: string) {
+      console.log('statSync', fn)
+      shim.process.__lasterr.errno = 1;
+
+      // let hand = shim.fds[fd];
+      // return { size: hand.buf.byteLength };
     },
     readSync(fd: number, buf: Buffer, start: number, len: number) {
       let hand = shim.fds[fd];
@@ -210,6 +222,7 @@ export let shim: NodeShim = {
         console.log("*", s);
         shim.stdout += s;
       },
+      columns: 80,
     },
     exit(v: number) {
       console.log("exit", v);

@@ -4,14 +4,49 @@ import * as monaco from "monaco-editor";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
-import { CompileRes } from "./types.ts";
+import { CompileReq, CompileRes } from "./types.ts";
 import { b64decode, b64encode } from "./base64.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 
+function getToken(model: monaco.editor.ITextModel, pos: monaco.Position) {
+  const lineContent = model.getLineContent(pos.lineNumber);
+  const regex = /([-+*&<>=]+|\w+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(lineContent)) !== null) {
+    const start = match.index + 1;
+    const end = start + match[0].length - 1;
+    if (pos.column >= start && pos.column <= end) {
+      return { word: match[0], startColumn: start, endColumn: end };
+    }
+  }
+}
+
 monaco.languages.register({ id: "idris" });
 monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
 monaco.languages.setLanguageConfiguration("idris", idrisConfig);
+monaco.languages.registerHoverProvider("idris", {provideHover: async (model, pos, token, ctx) => {
+
+  // getToken doesn't work because of the parsing in :typeat
+  const word = model.getWordAtPosition(pos);
+  if (word) {
+    let range: monaco.IRange = {
+      startLineNumber: pos.lineNumber,
+      startColumn: word.startColumn,
+      endColumn: word.endColumn,
+      endLineNumber: pos.lineNumber,
+    }
+    // TODO - need to distinguish errors from proper results (both emit text)
+    let res = await runCommand('repl', `:typeat ${pos.lineNumber} ${word.startColumn} ${word.word}`)
+    if (res) {
+      return {
+        contents: [{value: "```\n" + res + "\n```"}],
+        range
+      };
+    }
+  }
+  return undefined
+}})
 
 const iframe = document.createElement("iframe");
 iframe.src = "frame.html";
@@ -20,8 +55,37 @@ document.body.appendChild(iframe);
 
 const idrisWorker = new Worker("worker.js");
 
-function build(src: string) {
-  idrisWorker.postMessage({ cmd: "build", src });
+
+function getFilename(src: string) {
+  let module = "Main";
+  let m = src.match(/module (\w+)/);
+  if (m) module = m[1];
+  return `${module}.idr`;
+}
+let replHeader = ''
+async function build(src: string) {
+  if (!replHeader) {
+    replHeader = await runCommand('repl', '')
+    state.repl.value += replHeader
+  }
+  let fn = getFilename(src)
+  console.log('FN', fn)
+  let result = await runCommand('save', src)
+  console.log('saved', result)
+  let output = await runCommand('repl', `:load "${fn}"`)
+  console.log('output now', result)
+  state.output.value = output
+  state.result.value = {output, javascript:'', id:'', cases:'', duration:0}
+}
+
+type Suspense<T> ={ resolve: (value: T | PromiseLike<T>) => void, reject: (reason?: any) => void}
+
+const callbacks: Record<string, Suspense<string>> = {}
+
+function runCommand(cmd: CompileReq['cmd'], src: string) {
+  let id = crypto.randomUUID()
+  idrisWorker.postMessage({ id, cmd, src})
+  return new Promise<string>((resolve, reject) => (callbacks[id] = {resolve, reject})) 
 }
 
 function runOutput() {
@@ -33,14 +97,24 @@ function runOutput() {
     console.error(e);
   }
 }
+
 window.onmessage = (ev) => {
   console.log("window got", ev.data);
   if (ev.data.messages) state.messages.value = ev.data.messages;
 };
+
 idrisWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
-  state.result.value = ev.data
-  state.output.value = ev.data.output;
-  state.javascript.value = ev.data.javascript;
+  let suspense = callbacks[ev.data.id];
+  console.log('MSG', ev.data, 'suspense', suspense)
+  if (suspense) {
+    suspense.resolve(ev.data.output);
+    delete callbacks[ev.data.id]
+  } else { 
+    console.log('OLDSCHOOL')
+    state.result.value = ev.data
+    state.output.value = ev.data.output;
+    state.javascript.value = ev.data.javascript;
+  }
 };
 
 self.MonacoEnvironment = {
@@ -52,6 +126,7 @@ self.MonacoEnvironment = {
 
 const state = {
   result: signal<CompileRes|null>(null),
+  repl: signal<string>(""),
   output: signal(""),
   javascript: signal(""),
   messages: signal<string[]>([]),
@@ -175,13 +250,47 @@ function Console() {
   );
 }
 
+function Repl() {
+  let onKeyPress = async (ev: KeyboardEvent) => {
+    if (ev.key === 'Enter') {
+      if (ev.target instanceof HTMLInputElement) {
+        let cmd = ev.target.value
+        ev.target.value = ''
+        state.repl.value += `> ${cmd}\n`
+        let resp = await runCommand('repl', cmd)
+        state.repl.value += resp + "\n"
+      }
+    }
+    console.log('KP', ev.key)
+  }
+  let onClick = () => (state.repl.value = replHeader)
+  let ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.scrollTop = Math.max(0, ref.current.scrollHeight - ref.current.clientHeight)
+    }
+  })
+  return h(
+    'div',
+    {id:'repl', className: 'vbox'},
+    h('div', {className: 'replTop stretch', ref}, state.repl.value),
+    h('div', {className: 'replBottom hbox'},
+      h('div',{},'>'),
+      h('input', {onKeyPress, className: 'stretch'}),
+      h('button', {className: 'clear', onClick}, '⨉'),
+      // h('div', {className: 'clear', onClick}, 'X'),
+    )
+  )
+}
+
 const RESULTS = "Output";
+const REPL = "REPL";
 const JAVASCRIPT = "JS";
 const CONSOLE = "Console";
 const CASES = "Case Trees";
 
 function Tabs() {
-  const [selected, setSelected] = useState(localStorage.tab ?? RESULTS);
+  const [selected, setSelected] = useState(localStorage.tab ?? REPL);
   const Tab = (label: string) => {
     let onClick = () => {
       setSelected(label);
@@ -193,11 +302,14 @@ function Tabs() {
   };
 
   useEffect(() => {
-    if (state.messages.value) setSelected(CONSOLE);
+    if (state.messages.value.length) setSelected(CONSOLE);
   }, [state.messages.value]);
 
   let body;
   switch (selected) {
+    case REPL:
+      body = h(Repl, {});
+      break;
     case RESULTS:
       body = h(Result, {field:'output'});
       break;
@@ -220,6 +332,7 @@ function Tabs() {
     h(
       "div",
       { className: "tabBar" },
+      Tab(REPL),
       Tab(RESULTS),
       Tab(JAVASCRIPT),
       Tab(CONSOLE),
@@ -305,20 +418,26 @@ const processOutput = (
   editor: monaco.editor.IStandaloneCodeEditor,
   output: string
 ) => {
+  console.log('PROCESS OUTPUT', output)
   let model = editor.getModel()!;
   let markers: monaco.editor.IMarkerData[] = [];
   let lines = output.split("\n");
   let error: undefined | ["ERROR", string];
+  let FCRE = /^\w+:(\d+):(\d+)--(\d+):(\d+).*/m
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
 
     if (line.match(/^Error: .*/)) {
-      while (lines[i + 1]) line = line + " " + lines[++i];
+      console.log('WOO', line)
+      // sometimes there is a blank line and then the chunk with the location
+      while (lines[i + 1] || lines[i+2]?.match(FCRE)) line = line + "\n" + lines[++i];
+      console.log('BAR', line)
       error = ["ERROR", line];
     }
     // Foo:4:25--4:29
-    const match = line.match(/^\w+:(\d+):(\d+)--(\d+):(\d+).*/);
+    const match = line.match(FCRE);
     if (match && error) {
+      console.log('match', match)
       let [_full, sr, sc, er, ec] = match;
       let [kind, message] = error;
       const severity =

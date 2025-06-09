@@ -19,6 +19,7 @@ declare global {
   interface Window {
     state: any
   }
-  let newtMain: () => unknown;
+  let runCommand: (cmd: string) => unknown;
   let __mainExpression_0: () => unknown;
+
 }
