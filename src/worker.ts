@@ -1,13 +1,11 @@
 // Worker to run idris on source code
 import { shim } from "./emul";
 import { archive, preload } from "./preload";
-import { CompileReq, CompileRes } from "./types";
+import { WorkerReq, CompileRes } from "./types";
 
-const handleMessage = async function (ev: { data: CompileReq }) {
-  console.log("message", ev.data);
-  await preload;
-  shim.archive = archive
-  let { src } = ev.data;
+
+function doCompile(data: WorkerReq) {
+  let { id, src } = data;
   let module = "Main";
   let m = src.match(/module (\w+)/);
   if (m) module = m[1];
@@ -33,7 +31,63 @@ const handleMessage = async function (ev: { data: CompileReq }) {
   let javascript = new TextDecoder().decode(shim.files[outfile]);
   let cases = shim.files['cases.out'] ? new TextDecoder().decode(shim.files['cases.out']) : '';
   let output = shim.stdout;
-  sendResponse({ cases, javascript, output, duration });
+  sendResponse({ cases, javascript, output, duration, id });
+}
+
+function doSave(data: WorkerReq) {
+  let {id, src} = data
+  let module = "Main";
+  let m = src.match(/module (\w+)/);
+  if (m) module = m[1];
+  let fn = `${module}.idr`;
+  shim.files[fn] = new TextEncoder().encode(src)
+  let resp: any = {id, output: fn}
+  console.log('resp', resp)
+  sendResponse(resp)
+}
+function doLoad(data: WorkerReq) {
+  let {id, src} = data
+  let buf = shim.files[src]
+  let resp: any = {id, output: new TextDecoder().decode(buf)}
+  sendResponse(resp)
+}
+
+let initialized = false
+function doRepl(data: WorkerReq) {
+  shim.stdout = ''
+  if (!initialized) {
+    // this runs too early at startup
+    process.argv = ["", "", "--dumpcases", "cases.out"];
+    __mainExpression_0()
+    initialized = true
+    console.log(shim.stdout)
+  }
+  let {src,id} = data
+  let start = +new Date()
+  let res = runCommand(src)
+  let duration = +new Date() - start;
+  console.log(src, '->', res)
+  let output = shim.stdout
+  // res : Either Error REPLResult
+  // but thats the Core Error, REPL errors are a REPLError result
+  // TODO we signal error with a prepended string for now, but let's return a richer structure
+  if (res.h && res.a1.h === 1) output = `ERROR: ${res.a1}`
+  sendResponse({id, output, javascript: '', duration, cases:''})
+}
+
+const handleMessage = async function (ev: { data: WorkerReq }) {
+  console.log("message", ev.data);
+  await preload;
+  console.log('dispatch')
+  shim.archive = archive
+  switch (ev.data.cmd) {
+    case 'build': return doCompile(ev.data)
+    case 'repl': return doRepl(ev.data)
+    case 'save': return doSave(ev.data)
+    case 'load': return doLoad(ev.data);
+    default:
+    const _covering: never = ev.data.cmd;
+  }
 };
 
 // hooks for worker.html to override

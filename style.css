@@ -1,4 +1,3 @@
-
 svg.icon path {
   stroke: black;
   fill: none;
@@ -100,19 +99,50 @@ svg.icon path {
   border-bottom: 0px
 }
 .tabBody {
-  overflow: auto;
   flex: 1 1;
+  height: 10px;
 }
-.horizontal .tabBody.editor {
-  overflow: unset;
+.prompt {
+  font-size:14px;
+  padding-right: 3px;
 }
+.clear {
+  border:none;
+  background: inherit;
+}
+
 #result, #javascript, #output, #cases {
+  padding: 5px;
+  overflow: auto;
+}
+#result, #javascript, #output, #cases, #repl {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
-  padding: 5px;
 }
 /* Do we want to wrap? */
 #cases {
   white-space: pre-wrap;
+}
+#repl {
+  height: 100%;
+}
+.replTop {
+  height: 50px;
+  overflow: auto;
+  white-space: pre;
+}
+.replBottom {
+  padding: 5px;
+}
+.vbox {
+  display: flex;
+  flex-direction: column;
+}
+.hbox {
+  display: flex;
+  flex-direction: row;
+}
+.stretch {
+  flex: 1 1;
 }

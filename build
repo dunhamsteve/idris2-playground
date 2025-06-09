@@ -5,13 +5,14 @@ echo build idris worker
 esbuild src/worker.ts --bundle --format=esm > public/worker.js
 (
     cd idris
-    zip -r files.zip idris2-0.7.0 2025050900 
+    zip -r files.zip idris2-0.7.0 2025050900 > /dev/null
 )
 cp -r samples/* public
 cp idris/files.zip public
 (
-    echo "let __mainExpression_0=(function(){"
+    echo "let {__mainExpression_0,runCommand}=(function(){"
     cat idris/idris2.js
-    echo "return __mainExpression_0})()"
+    cat idris/patch.js
+    echo "return {__mainExpression_0, runCommand}})()"
 ) |grep -v '^#' | grep -v 'try{__mainExpression_0' > idris/idris2.edit.js
 esbuild --minify idris/idris2.edit.js > public/idris2.js

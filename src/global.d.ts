@@ -19,6 +19,9 @@ declare global {
   interface Window {
     state: any
   }
-  let newtMain: () => unknown;
+  type ReplResponse = { h: 0, a1: string} | {h:1, a1: { h: number}}
+
+  let runCommand: (cmd: string) => ReplResponse;
   let __mainExpression_0: () => unknown;
+
 }
