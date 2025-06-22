@@ -106,7 +106,7 @@ function runCommand(cmd: WorkerReq["cmd"], src: string) {
 }
 // make the run thinger update javacript first if empty
 async function runOutput() {
-  if (!state.javascript.value) await updateJavacript()
+  if (!state.javascript.value) await updateJavascript()
   const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
@@ -248,11 +248,9 @@ function Editor({ initialValue }: EditorProps) {
   return h("div", { id: "editor", ref });
 }
 
-async function updateJavacript() {
-  let result = await runCommand("repl", ":c output main");
-  console.log("JSRES", result);
-  let javascript = await runCommand("load", "build/exec/output");
-  console.log('loaded', javascript)
+async function updateJavascript() {
+  await runCommand("build", state.editor.value?.getValue() ?? '')
+  let javascript = await runCommand("load", "build/exec/out.js");
   state.javascript.value = javascript;
 }
 
@@ -260,7 +258,7 @@ async function updateJavacript() {
 function JavaScript() {
   const text = state.javascript.value;
   useEffect(() => {
-    updateJavacript().catch(console.error);
+    if (!text) updateJavascript().catch(console.error);
   }, [text]);
   return h("div", { id: "javascript" }, text);
 }

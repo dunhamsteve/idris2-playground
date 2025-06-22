@@ -11,7 +11,7 @@ function doCompile(data: WorkerReq) {
   if (m) module = m[1];
   let fn = `${module}.idr`;
   const outfile = "build/exec/out.js";
-  process.argv = ["foo", "bar", "-c", fn, "-o", "out.js", "--dumpcases", "cases.out"];
+  process.argv = ["foo", "bar", "--cg", "javascript", "-c", fn, "-o", "out.js", "--dumpcases", "cases.out"];
   console.log("Using args", process.argv);
   delete shim.files['cases.out']
   shim.files[fn] = new TextEncoder().encode(src);
@@ -52,26 +52,28 @@ function doLoad(data: WorkerReq) {
   sendResponse(resp)
 }
 
-let initialized = false
+let runReplCommand: (cmd: string) => ReplResponse | undefined
 function doRepl(data: WorkerReq) {
   shim.stdout = ''
-  if (!initialized) {
-    // this runs too early at startup
-    process.argv = ["", "", "--dumpcases", "cases.out"];
+  if (!runReplCommand) {
+    // this runs too early at startup, so we start up again once
+    // we need --cg node for :exec, but --cg javascript for in browser
+    // so we capture a copy of runCommand with our setup
+    process.argv = ["", "", "--cg", "node"];
     __mainExpression_0()
-    initialized = true
+    runReplCommand = runCommand
     console.log(shim.stdout)
   }
   let {src,id} = data
   let start = +new Date()
-  let res = runCommand(src)
+  let res = runReplCommand(src)
   let duration = +new Date() - start;
   console.log(src, '->', res)
   let output = shim.stdout
   // res : Either Error REPLResult
   // but thats the Core Error, REPL errors are a REPLError result
   // TODO we signal error with a prepended string for now, but let's return a richer structure
-  if (res.h && res.a1.h === 1) output = `ERROR: ${res.a1}`
+  if (res?.h && res.a1.h === 1) output = `ERROR: ${output}`
   sendResponse({id, output, javascript: '', duration, cases:''})
 }
 

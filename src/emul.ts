@@ -89,6 +89,7 @@ export interface NodeShim {
     platform(): string;
   };
   fs: any;
+  child_process: any;
 }
 export let shim: NodeShim = {
   // these three and process are poked at externally
@@ -105,6 +106,15 @@ export let shim: NodeShim = {
     platform() {
       return "linux";
     },
+  },
+  child_process: {
+    spawnSync(cmd: string) {
+      console.log('spawn', cmd)
+      let file = shim.files['build/exec/_tmp_node.js']
+      let src = new TextDecoder().decode(file);
+      new Function(src.slice(src.indexOf('\n')))()
+      return {status:0}
+    }
   },
   fs: {
     // TODO - Idris is doing readdir, we should implement that
