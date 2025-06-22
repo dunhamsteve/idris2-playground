@@ -155,7 +155,6 @@ window.state = state;
 
 if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
-    console.log("CHANGE", ev);
     if (ev.matches) {
       monaco.editor.setTheme("vs-dark");
       document.body.className = "dark";
@@ -278,14 +277,55 @@ function Console() {
 }
 
 function Repl() {
+  let [history, setHistory] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.replHistory)
+    } catch (e) {
+      return []
+    }
+  })
+  let [tmpHistory, setTmpHistory] = useState<string[]>(history.concat(''))
+  let [pos, setPos] = useState(tmpHistory.length - 1)
+
+  let onKeyDown = async (ev: KeyboardEvent) => {
+    if (ev.target instanceof HTMLInputElement) {
+      const input = ev.target
+      let delta = 0
+      if (ev.code === 'ArrowUp') delta = -1
+      if (ev.code === 'ArrowDown') delta = 1
+      if (delta !== 0) {
+        ev.preventDefault()
+        if (tmpHistory[pos+delta] !== undefined) {
+          setPos(pos + delta)
+          setTmpHistory(tmpHistory => {
+            let tmp = tmpHistory.slice(0)
+            tmp[pos] = input.value
+            input.value = tmp[pos+delta]
+            return tmp
+          })
+        }
+      }
+    }
+  }
   let onKeyPress = async (ev: KeyboardEvent) => {
+    if (ev.code === "KeyL" && ev.ctrlKey) {
+      state.repl.value = replHeader
+    }
     if (ev.key === "Enter") {
       if (ev.target instanceof HTMLInputElement) {
         let cmd = ev.target.value;
-        ev.target.value = "";
         state.repl.value += `> ${cmd}\n`;
         let resp = await runCommand("repl", cmd);
         state.repl.value += resp + "\n";
+        const newHistory = history.slice(0)
+        if (newHistory[newHistory.length-1] !== cmd)
+            newHistory.push(cmd)
+        while (newHistory.length > 20) newHistory.shift()
+        setHistory(newHistory)
+        setPos(tmpHistory.length)
+        setTmpHistory((history.concat(cmd)).concat(''))
+        ev.target.value = "";
+        localStorage.replHistory = JSON.stringify(newHistory)
       }
     }
   };
@@ -299,6 +339,8 @@ function Repl() {
       );
     }
   });
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => inputRef.current?.focus(), [])
   return h(
     "div",
     { id: "repl", className: "vbox" },
@@ -307,7 +349,7 @@ function Repl() {
       "div",
       { className: "replBottom hbox" },
       h("div", { className: 'prompt'}, "›"),
-      h("input", { onKeyPress, className: "stretch" }),
+      h("input", { onKeyPress, onKeyDown, ref: inputRef, className: "stretch" }),
       h("button", { className: "clear", title: 'clear', onClick }, "⨂")
     )
   );
@@ -446,7 +488,6 @@ const processOutput = (
   editor: monaco.editor.IStandaloneCodeEditor,
   output: string
 ) => {
-  console.log("PROCESS OUTPUT", output);
   let model = editor.getModel()!;
   let markers: monaco.editor.IMarkerData[] = [];
   let lines = output.split("\n");
@@ -456,17 +497,14 @@ const processOutput = (
     let line = lines[i];
 
     if (line.match(/^Error: .*/)) {
-      console.log("WOO", line);
       // sometimes there is a blank line and then the chunk with the location
       while (lines[i + 1] || lines[i + 2]?.match(FCRE))
         line = line + "\n" + lines[++i];
-      console.log("BAR", line);
       error = ["ERROR", line];
     }
     // Foo:4:25--4:29
     const match = line.match(FCRE);
     if (match && error) {
-      console.log("match", match);
       let [_full, sr, sc, er, ec] = match;
       let [kind, message] = error;
       const severity =
