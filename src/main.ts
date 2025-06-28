@@ -356,14 +356,15 @@ function Repl() {
 }
 
 const REPL = "REPL";
+const OUTPUT = "Output";
 const JAVASCRIPT = "JS Source";
 const CONSOLE = "JS Console";
 const CASES = "Case Trees";
 
-let TABS = [REPL, JAVASCRIPT, CONSOLE]
+let TABS = [OUTPUT, REPL, JAVASCRIPT, CONSOLE]
 
 function Tabs() {
-  const [selected, setSelected] = useState(TABS.includes(localStorage.tab) ? localStorage.tab : REPL);
+  const [selected, setSelected] = useState(TABS.includes(localStorage.tab) ? localStorage.tab : OUTPUT);
   const Tab = (label: string) => {
     let onClick = () => {
       setSelected(label);
@@ -392,6 +393,9 @@ function Tabs() {
     case CASES:
       body = h(Result, { field: "cases" });
       break;
+    case OUTPUT:
+      body = h(Result, { field: "output" });
+      break;
     default:
       body = h("div", {});
   }
@@ -402,6 +406,7 @@ function Tabs() {
     h(
       "div",
       { className: "tabBar" },
+      Tab(OUTPUT),
       Tab(REPL),
       Tab(JAVASCRIPT),
       Tab(CONSOLE),
