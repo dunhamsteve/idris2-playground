@@ -1,56 +1,53 @@
-import { effect, signal } from "@preact/signals";
-import { idrisConfig, idrisTokens } from "./monarch.ts";
-import * as monaco from "monaco-editor";
+import { signal } from "@preact/signals";
+import { Diagnostic } from "@codemirror/lint";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
-import { WorkerReq, CompileRes } from "./types.ts";
-import { b64decode, b64encode } from "./base64.ts";
+import { archive, preload } from "./preload.ts";
+import { b64decode, b64encode } from "./base64";
+import {
+  AbstractEditor,
+  EditorDelegate,
+  TopData,
+  Marker,
+  WorkerReq,
+  CompileRes,
+} from "./types.ts";
+import { CMEditor } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
+// import { IPC } from "./ipc.ts";
 
-function getToken(model: monaco.editor.ITextModel, pos: monaco.Position) {
-  const lineContent = model.getLineContent(pos.lineNumber);
-  const regex = /([-+*&<>=]+|\w+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(lineContent)) !== null) {
-    const start = match.index + 1;
-    const end = start + match[0].length - 1;
-    if (pos.column >= start && pos.column <= end) {
-      return { word: match[0], startColumn: start, endColumn: end };
-    }
-  }
-}
 
-monaco.languages.register({ id: "idris" });
-monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
-monaco.languages.setLanguageConfiguration("idris", idrisConfig);
-monaco.languages.registerHoverProvider("idris", {
-  provideHover: async (model, pos, token, ctx) => {
-    // getToken doesn't work because of the parsing in :typeat
-    const word = model.getWordAtPosition(pos);
-    if (word) {
-      let range: monaco.IRange = {
-        startLineNumber: pos.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn,
-        endLineNumber: pos.lineNumber,
-      };
-      // TODO - need to distinguish errors from proper results (both emit text)
-      let res = await runCommand(
-        "repl",
-        `:typeat ${pos.lineNumber} ${word.startColumn} ${word.word}`
-      );
-      if (res && !res.startsWith('ERROR')) {
-        return {
-          contents: [{ value: "```\n" + res + "\n```" }],
-          range,
-        };
-      }
-    }
-    return undefined;
-  },
-});
+// monaco.languages.register({ id: "idris" });
+// monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
+// monaco.languages.setLanguageConfiguration("idris", idrisConfig);
+// monaco.languages.registerHoverProvider("idris", {
+//   provideHover: async (model, pos, token, ctx) => {
+//     // getToken doesn't work because of the parsing in :typeat
+//     const word = model.getWordAtPosition(pos);
+//     if (word) {
+//       let range: monaco.IRange = {
+//         startLineNumber: pos.lineNumber,
+//         startColumn: word.startColumn,
+//         endColumn: word.endColumn,
+//         endLineNumber: pos.lineNumber,
+//       };
+//       // TODO - need to distinguish errors from proper results (both emit text)
+//       let res = await runCommand(
+//         "repl",
+//         `:typeat ${pos.lineNumber} ${word.startColumn} ${word.word}`
+//       );
+//       if (res && !res.startsWith('ERROR')) {
+//         return {
+//           contents: [{ value: "```\n" + res + "\n```" }],
+//           range,
+//         };
+//       }
+//     }
+//     return undefined;
+//   },
+// });
 
 const iframe = document.createElement("iframe");
 iframe.src = "frame.html";
@@ -147,8 +144,9 @@ const state = {
   repl: signal<string>(""),
   output: signal(""),
   javascript: signal(""),
+  dark: signal(false),
   messages: signal<string[]>([]),
-  editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
+  editor: signal<AbstractEditor | null>(null),
   toast: signal(""),
 };
 window.state = state;
@@ -156,11 +154,13 @@ window.state = state;
 if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
     if (ev.matches) {
-      monaco.editor.setTheme("vs-dark");
       document.body.className = "dark";
+      state.dark.value = true;
+      state.editor.value?.setDark(true);
     } else {
-      monaco.editor.setTheme("vs");
       document.body.className = "light";
+      state.dark.value = false;
+      state.editor.value?.setDark(false);
     }
   }
   let query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -206,40 +206,79 @@ const LOADING = "module Loading\n";
 let value = getSavedCode();
 let initialVertical = localStorage.vertical == "true";
 
-// the editor might handle this itself with the right prodding.
-effect(() => {
-  let text = state.output.value;
-  let editor = state.editor.value;
-  if (editor) processOutput(editor, text);
-});
-
 interface EditorProps {
   initialValue: string;
 }
+
+
+const language: EditorDelegate = {
+  async getEntry(word, _row, _col) {
+     let res = await runCommand(
+        "repl",
+        `:typeat ${_row} ${_col} ${word}`
+      );
+      if (res && !res.startsWith('ERROR')) {
+        return {
+          fc: {
+            file: 'FIXME',
+            line: _row,
+            col: _col,
+          },
+          name: word,
+          type: res,
+        };
+      }
+    return undefined
+  },
+  onChange(_value) {
+    // we're using lint() now
+  },
+  getFileName() {
+    return "FIXME"
+    // if (!topData) return "";
+    // let last = topData.context[topData.context.length - 1];
+    // return last.fc.file;
+  },
+  async lint(view) {
+    console.log("LINT");
+    let src = view.state.doc.toString();
+    localStorage.code = src;
+    let value = src
+        
+    await build(value);
+    let markers = processOutput(state.output.value)
+    try {
+    
+      let diags: Diagnostic[] = [];
+      for (let marker of markers) {
+        let col = marker.startColumn;
+
+        let line = view.state.doc.line(marker.startLineNumber);
+        const pos = line.from + col - 1;
+        let word = view.state.wordAt(pos);
+        diags.push({
+          from: word?.from ?? pos,
+          to: word?.to ?? pos + 1,
+          severity: marker.severity,
+          message: marker.message,
+        });
+      }
+      return diags;
+    } catch (e) {
+      console.error(e)
+    }
+    return []
+  },
+};
 
 function Editor({ initialValue }: EditorProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const container = ref.current!;
-    const editor = monaco.editor.create(container, {
-      value,
-      language: "idris",
-      fontFamily: "Comic Code, Menlo, Monaco, Courier New, sans",
-      automaticLayout: true,
-      acceptSuggestionOnEnter: "off",
-      unicodeHighlight: { ambiguousCharacters: false },
-      minimap: { enabled: false },
-    });
+    const editor = new CMEditor(container, value, language);
     state.editor.value = editor;
+    editor.setDark(state.dark.value)
 
-    editor.onDidChangeModelContent((ev) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        let value = editor.getValue();
-        build(value);
-        localStorage.idrisCode = value;
-      }, 1000);
-    });
     if (initialValue === LOADING) loadFile("Main.idr");
     else build(initialValue);
   }, []);
@@ -434,7 +473,7 @@ function EditWrap({
       loadFile(fn);
     }
   };
-  let play = "M0 0 L20 10 L0 20 z";
+  // let play = "M0 0 L20 10 L0 20 z";
   let svg = (d: string) =>
     h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
   let d = vertical
@@ -449,7 +488,7 @@ function EditWrap({
       h(
         "select",
         { onChange },
-        h("option", { value: "" }, "choose sample"),
+        h("option", { value: "" }, "load sample"),
         options
       ),
       h("div", { style: { flex: "1 1" } }),
@@ -490,11 +529,9 @@ render(h(App, {}), document.getElementById("app")!);
 let timeout: any;
 
 const processOutput = (
-  editor: monaco.editor.IStandaloneCodeEditor,
   output: string
 ) => {
-  let model = editor.getModel()!;
-  let markers: monaco.editor.IMarkerData[] = [];
+  let markers: Marker[] = [];
   let lines = output.split("\n");
   let error: undefined | ["ERROR", string];
   let FCRE = /^\w+:(\d+):(\d+)--(\d+):(\d+).*/m;
@@ -512,13 +549,8 @@ const processOutput = (
     if (match && error) {
       let [_full, sr, sc, er, ec] = match;
       let [kind, message] = error;
-      const severity =
-        kind === "ERROR"
-          ? monaco.MarkerSeverity.Error
-          : monaco.MarkerSeverity.Info;
-
       markers.push({
-        severity,
+        severity: kind === "ERROR" ? "error" : "info",
         message,
         startLineNumber: +sr,
         startColumn: +sc,
@@ -528,5 +560,6 @@ const processOutput = (
       error = undefined;
     }
   }
-  monaco.editor.setModelMarkers(model, "idris", markers);
+  console.log("markers", markers);
+  return markers;
 };
