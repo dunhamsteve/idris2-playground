@@ -127,6 +127,9 @@ svg.icon path {
 #repl {
   height: 100%;
 }
+#editor .cm-editor {
+  height: 100%;
+}
 .replTop {
   height: 50px;
   overflow: auto;
