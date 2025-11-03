@@ -115,7 +115,7 @@ svg.icon path {
   padding: 5px;
   overflow: auto;
 }
-#result, #javascript, #output, #cases, #repl {
+#result, #javascript, #output, #cases, #repl, .cm-tooltip {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
@@ -148,4 +148,7 @@ svg.icon path {
 }
 .stretch {
   flex: 1 1;
+}
+.cm-tooltip {
+  padding: 5px;
 }

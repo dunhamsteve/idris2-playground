@@ -121,7 +121,6 @@ export let shim: NodeShim = {
     opendirSync(name: string) {
       let fd = shim.fds.findIndex((x) => !x);
       if (fd < 0) fd = shim.fds.length;
-      console.log("openDir", name);
       shim.process.__lasterr.errno = 0;
       return fd;
     },
@@ -131,9 +130,6 @@ export let shim: NodeShim = {
       return 0;
     },
     openSync(name: string, mode: string) {
-      console.log("open", name, mode);
-      let te = new TextEncoder();
-
       let fd = shim.fds.findIndex((x) => !x);
       if (fd < 0) fd = shim.fds.length;
       let buf: Uint8Array;

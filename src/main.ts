@@ -132,13 +132,6 @@ idrisWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
   }
 };
 
-self.MonacoEnvironment = {
-  getWorkerUrl(moduleId, _label) {
-    console.log("Get worker", moduleId);
-    return moduleId;
-  },
-};
-
 const state = {
   result: signal<CompileRes | null>(null),
   repl: signal<string>(""),
@@ -210,31 +203,47 @@ interface EditorProps {
   initialValue: string;
 }
 
-
 const language: EditorDelegate = {
   async getEntry(word, _row, _col) {
-     let res = await runCommand(
-        "repl",
-        `:typeat ${_row} ${_col} ${word}`
-      );
-      if (res && !res.startsWith('ERROR')) {
-        return {
-          fc: {
-            file: 'FIXME',
-            line: _row,
-            col: _col,
-          },
-          name: word,
-          type: res,
-        };
-      }
-    return undefined
+    let res = await runCommand("repl", `:typeat ${_row} ${_col} ${word}`);
+    if (res && !res.startsWith("ERROR")) {
+      return {
+        fc: {
+          file: "FIXME",
+          line: _row,
+          col: _col,
+        },
+        name: word,
+        type: res,
+      };
+    }
+    return undefined;
+  },
+  async caseSplit(word, _row, _col) {
+    let res = await runCommand("repl", `:cs ${_row} ${_col} ${word}`);
+    if (res && !res.startsWith("ERROR") && !res.startsWith("No clause")) return res;
+    return undefined;
+  },
+  async command(cmd, word, row, col) {
+    if (cmd == "proofSearch") {
+      let res = await runCommand("repl", `:ps ${row} ${word}`);
+      if (res && !res.startsWith("ERROR")) return res;
+      console.error(res)
+      return undefined;
+    }
+    if (cmd == "intro") {
+      let res = await runCommand("repl", `:intro ${row} ${word}`);
+      if (res && !res.startsWith("ERROR")) return res;
+      console.error(res)
+      return undefined;
+    }
+    return undefined;
   },
   onChange(_value) {
     // we're using lint() now
   },
   getFileName() {
-    return "FIXME"
+    return "FIXME";
     // if (!topData) return "";
     // let last = topData.context[topData.context.length - 1];
     // return last.fc.file;
@@ -243,12 +252,11 @@ const language: EditorDelegate = {
     console.log("LINT");
     let src = view.state.doc.toString();
     localStorage.code = src;
-    let value = src
-        
+    let value = src;
+
     await build(value);
-    let markers = processOutput(state.output.value)
+    let markers = processOutput(state.output.value);
     try {
-    
       let diags: Diagnostic[] = [];
       for (let marker of markers) {
         let col = marker.startColumn;
@@ -265,9 +273,9 @@ const language: EditorDelegate = {
       }
       return diags;
     } catch (e) {
-      console.error(e)
+      console.error(e);
     }
-    return []
+    return [];
   },
 };
 

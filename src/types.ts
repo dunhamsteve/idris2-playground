@@ -47,8 +47,13 @@ interface TopEntry {
 export interface TopData {
   context: TopEntry[];
 }
+
+export type EditCommand = 'proofSearch' | 'intro'
 export interface EditorDelegate {
   getEntry(word: string, row: number, col: number): Promise<TopEntry | undefined>
+  caseSplit(word: string, row: number, col: number): Promise<string | undefined>
+  // This could handle case split if we can indicate a line edit
+  command(cmd: EditCommand, word: string, row: number, col: number): Promise<string|undefined>
   onChange(value: string): unknown
   getFileName(): string
   lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[]

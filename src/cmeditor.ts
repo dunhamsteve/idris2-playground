@@ -1,7 +1,7 @@
-import { AbstractEditor, EditorDelegate, Marker } from "./types";
+import { AbstractEditor, EditCommand, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
 import { defaultKeymap, indentMore, indentLess, toggleLineComment } from "@codemirror/commands";
-import { EditorView, hoverTooltip, keymap, Tooltip } from "@codemirror/view";
+import { Command, EditorView, hoverTooltip, keymap, Tooltip } from "@codemirror/view";
 import { Compartment, Prec } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { linter } from "@codemirror/lint";
@@ -174,6 +174,41 @@ export class CMEditor implements AbstractEditor {
     this.delegate = delegate;
     this.theme = new Compartment();
 
+    const runCommand =
+      (cmd: EditCommand): Command =>
+      () => {
+        let pos = this.view.state.selection.ranges[0].anchor;
+        let cursor = this.view.state.doc.lineAt(pos);
+        let line = cursor.number;
+        let range = this.view.state.wordAt(pos);
+        console.log(range);
+        if (!range) return false;
+        let col = range.from - cursor.from;
+        let word = this.view.state.doc.sliceString(range.from, range.to);
+        // might want to have a generalized function that returns edits
+        // maybe see what ide-mode can do and expose it as an extern?
+        this.delegate.command(cmd, word, line, col).then((result) => {
+          if (result) {
+            console.log("GOT", JSON.stringify(result));
+            let opts = result.trim().split("\n");
+            // FIXME - intro gives multiple choice, we'll want to prompt the user
+            // need to put UI on the screen..
+            if (opts.length > 1) {
+              let eline = this.view.state.doc.line(line);
+              let coord = this.view.coordsAtPos(eline.from + col);
+              console.log("pos", coord);
+              return;
+            }
+            let { from, to } = range;
+            if (cursor.text[from - cursor.from - 1] === "?") from--;
+            this.view.dispatch({
+              changes: { from, to, insert: result },
+            });
+          }
+        });
+        return true;
+      };
+
     this.view = new EditorView({
       doc,
       parent: container,
@@ -205,9 +240,49 @@ export class CMEditor implements AbstractEditor {
           {
             key: "c-c c-s",
             run: () => {
-              console.log("C-c C-s")
-              return false
-            }
+                console.log("C-c C-s");
+                return true;
+              },
+            },
+            {
+              key: "c-c c-r", // Intro
+              run: runCommand("intro"),
+            },
+            {
+              key: "c-c c-a",
+              run: runCommand("proofSearch"),
+            },
+            {
+              key: "c-c c-c",
+              run: () => {
+                console.log("C-c C-c");
+                let pos = this.view.state.selection.ranges[0].anchor;
+                let cursor = this.view.state.doc.lineAt(pos);
+                let line = cursor.number;
+                let range = this.view.state.wordAt(pos);
+
+                console.log(range);
+                if (!range) return false;
+                let col = range.from - cursor.from;
+                let word = this.view.state.doc.sliceString(
+                  range.from,
+                  range.to
+                );
+                // We can't return an accurate true/false because this is async
+                // hopefully the command doesn't have to complete before we return
+                this.delegate.caseSplit(word, line, col).then((result) => {
+                  if (result) {
+                    this.view.dispatch({
+                      changes: {
+                        from: cursor.from,
+                        to: cursor.to,
+                        insert: result,
+                      },
+                    });
+                  }
+                });
+                return true;
+              },
           },
           {
             key: "Shift-Tab",
