@@ -23,32 +23,42 @@ const keywords = [
   "case",
   "of",
   "data",
-  "U",
   "do",
-  "ptype",
-  "pfunc",
+  "export",
+  "public",
+  "rewrite",
+  "mutual",
+  "namespace",
   "module",
+  "covering",
+  "partial",
+  "failing",
+  "total",
+  "constructor",
+  "parameters",
+  "default",
+  "using",
+  "private",
+  "with",
+  "impossible",
+  "forall",
+  "auto",
+  "prefix",
+  "module",
+  "interface",
+  "implementation",
   "infixl",
   "infixr",
   "infix",
-  "∀",
   "forall",
   "import",
-  "uses",
-  "class",
-  "instance",
   "record",
   "constructor",
   "if",
   "then",
   "else",
-  "$",
   "λ",
-  "?",
-  "@",
-  ".",
   "->",
-  "→",
   ":",
   "=>",
   ":=",
@@ -60,39 +70,74 @@ const keywords = [
   "|",
 ];
 
+// a stack of tokenizers, current is first
+// we need to push / pop {} so we can parse strings correctly
 interface State {
-  tokenizer(stream: StringStream, state: State): string | null;
+  tokenizers: Tokenizer[]
 }
+type Tokenizer = (stream: StringStream, state: State) => string | null;
 
+
+// see https://lezer.codemirror.net/docs/ref/#highlight.Tag%5EdefineModifier for tag list
 function tokenizer(stream: StringStream, state: State): string | null {
   if (stream.eatSpace()) return null
   if (stream.match("--")) {
     stream.skipToEnd();
     return "comment";
   }
-  if (stream.match(/^[/]-/)) {
-    state.tokenizer = commentTokenizer;
-    return state.tokenizer(stream, state);
+  if (stream.match(/^[{]-/)) {
+    state.tokenizers.unshift(commentTokenizer);
+    return state.tokenizers[0](stream, state);
   }
-
-  // TODO match tokenizer better..
+  // maybe keyword?
+  if (stream.match(/{/)) {
+    state.tokenizers.unshift(tokenizer)
+    return null
+  }
+  if (stream.match(/}/) && state.tokenizers.length > 1) {
+    state.tokenizers.shift()
+    return null
+  }
+  if (stream.match(/"/)) {
+    state.tokenizers.unshift(stringTokenizer);
+    return stringTokenizer(stream, state);
+  }
   if (stream.match(/[^\\(){}[\],.@;\s][^()\\{}\[\],.@;\s]*/)) {
     let word = stream.current();
     if (keywords.includes(word)) return "keyword";
-    if (word[0] >= "A" && word[0] <= "Z") return "typename";
-    return "identifier";
+    if (word[0] >= "A" && word[0] <= "Z") return "typeName";
+    if (word[0] == '%') return "keyword";
+    return "variableName";
   }
   // unhandled
   stream.next()
   return null;
 }
+
+function stringTokenizer(stream: StringStream, state: State) {
+  let ch;
+  while ((ch = stream.next())) {
+    if (stream.match(/^\\{/)) {
+      state.tokenizers.unshift(tokenizer)
+      // Ideally, we'd tag the /{ bit differently
+      return "string";
+    }
+    if (ch === '"') {
+      state.tokenizers.shift()
+      return "string";
+    }
+  }
+  return "string";
+}
+
+// We don't need a tokenizer for this until we add nested comments
 function commentTokenizer(stream: StringStream, state: State): string | null {
   console.log("ctok");
   let dash = false;
   let ch;
   while ((ch = stream.next())) {
-    if (dash && ch === "/") {
-      state.tokenizer = tokenizer;
+    if (dash && ch === "}") {
+      state.tokenizers.shift()
       return "comment";
     }
     dash = ch === "-";
@@ -101,9 +146,13 @@ function commentTokenizer(stream: StringStream, state: State): string | null {
 }
 
 const newtLanguage2 = StreamLanguage.define({
-  startState: () => ({ tokenizer }),
+  startState: () => ({ tokenizers: [tokenizer] }),
   token(stream, st) {
-    return st.tokenizer(stream, st);
+    if (!st.tokenizers.length) {
+      console.error('NO TOKENIZER')
+      st.tokenizers.push(tokenizer)
+    }
+    return st.tokenizers[0](stream, st);
   },
   languageData: {
     commentTokens: {
