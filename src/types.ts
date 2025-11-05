@@ -55,7 +55,6 @@ export interface EditorDelegate {
   // This could handle case split if we can indicate a line edit
   command(cmd: EditCommand, word: string, row: number, col: number): Promise<string|undefined>
   onChange(value: string): unknown
-  getFileName(): string
   lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[]
 }
 export interface Marker {

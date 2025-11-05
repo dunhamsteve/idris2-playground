@@ -242,16 +242,9 @@ const language: EditorDelegate = {
   onChange(_value) {
     // we're using lint() now
   },
-  getFileName() {
-    return "FIXME";
-    // if (!topData) return "";
-    // let last = topData.context[topData.context.length - 1];
-    // return last.fc.file;
-  },
   async lint(view) {
-    console.log("LINT");
     let src = view.state.doc.toString();
-    localStorage.code = src;
+    localStorage.idrisCode = src;
     let value = src;
 
     await build(value);

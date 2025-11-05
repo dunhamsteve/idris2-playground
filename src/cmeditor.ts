@@ -96,7 +96,7 @@ function tokenizer(stream: StringStream, state: State): string | null {
   }
   if (stream.match(/}/) && state.tokenizers.length > 1) {
     state.tokenizers.shift()
-    return null
+    return state.tokenizers[0] === stringTokenizer ? "keyword" : null
   }
   if (stream.match(/"/)) {
     state.tokenizers.unshift(stringTokenizer);
@@ -115,19 +115,21 @@ function tokenizer(stream: StringStream, state: State): string | null {
 }
 
 function stringTokenizer(stream: StringStream, state: State) {
-  let ch;
-  while ((ch = stream.next())) {
-    if (stream.match(/^\\{/)) {
-      state.tokenizers.unshift(tokenizer)
-      // Ideally, we'd tag the /{ bit differently
+  while (true) {
+    if (stream.current() && stream.match(/^\\{/, false)) {
       return "string";
     }
+    if (stream.match(/^\\{/)) {
+      state.tokenizers.unshift(tokenizer)
+      return "keyword";
+    }
+    let ch = stream.next()
+    if (!ch) return "string";
     if (ch === '"') {
       state.tokenizers.shift()
       return "string";
     }
   }
-  return "string";
 }
 
 // We don't need a tokenizer for this until we add nested comments
