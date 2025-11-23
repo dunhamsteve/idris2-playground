@@ -12,6 +12,16 @@ The web page includes the monaco editor and runs Idris on your file, generating 
 
 The compiler is run one second after the user stops changing the document.  There is a toggle between horizontal and vertical layout to accomodate mobile clients. The last three tabs are only useful if there is a `main` function in your code. You can press `Ctrl-s` or `Cmd-s` to save your program in the url and copy it to the clipboard.
 
+## Keyboard Shortcuts
+
+| macos | linux / windows  | command |
+| ----- | ---------------- | ------- |
+| M-s   | C-s              | Embed code to url and copy to clipboard |
+| M-. i | C-. i | Introduce unambiguous constructor in hole |
+| M-. c | C-. c | Case split |
+| M-. s | C-. s | Proof search in hole |
+
+
 ## Running
 
 To get your own copy to deploy:
