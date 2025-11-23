@@ -238,32 +238,28 @@ export class CMEditor implements AbstractEditor {
             key: "Cmd-/",
             run: toggleLineComment,
           },
-          // ok, we can do multiple keys (we'll want this for Idris)
-          {
-            key: "c-c c-s",
-            run: () => {
-                console.log("C-c C-s");
-                return true;
-              },
-            },
+          // TODO figure out what prefix we want here and document it
+          // C-c from emacs conflicts with system copy/paste on most platforms
+          // I've got Control-. and Meta-. for now
             {
-              key: "c-c c-r", // Intro
+              // Intro
+              key: "c-. i",
+              mac: "m-. i",
               run: runCommand("intro"),
             },
             {
-              key: "c-c c-a",
+              key: "c-. s",
+              mac: "m-. s",
               run: runCommand("proofSearch"),
             },
             {
-              key: "c-c c-c",
+              key: "c-. c",
+              mac: "m-. c",
               run: () => {
-                console.log("C-c C-c");
                 let pos = this.view.state.selection.ranges[0].anchor;
                 let cursor = this.view.state.doc.lineAt(pos);
                 let line = cursor.number;
                 let range = this.view.state.wordAt(pos);
-
-                console.log(range);
                 if (!range) return false;
                 let col = range.from - cursor.from;
                 let word = this.view.state.doc.sliceString(
