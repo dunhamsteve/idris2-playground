@@ -17,6 +17,9 @@ import {
 
 // prettier flattened this...
 const keywords = [
+  "autobind",
+  "proof",
+  "typebind",
   "let",
   "in",
   "where",
@@ -57,7 +60,6 @@ const keywords = [
   "if",
   "then",
   "else",
-  "λ",
   "->",
   ":",
   "=>",
@@ -77,10 +79,9 @@ interface State {
 }
 type Tokenizer = (stream: StringStream, state: State) => string | null;
 
-
 // see https://lezer.codemirror.net/docs/ref/#highlight.Tag%5EdefineModifier for tag list
 function tokenizer(stream: StringStream, state: State): string | null {
-  if (stream.eatSpace()) return null
+  if (stream.eatSpace()) return null;
   if (stream.match("--")) {
     stream.skipToEnd();
     return "comment";
@@ -91,59 +92,66 @@ function tokenizer(stream: StringStream, state: State): string | null {
   }
   // maybe keyword?
   if (stream.match(/{/)) {
-    state.tokenizers.unshift(tokenizer)
-    return null
+    state.tokenizers.unshift(tokenizer);
+    return null;
   }
   if (stream.match(/}/) && state.tokenizers.length > 1) {
-    state.tokenizers.shift()
-    return state.tokenizers[0] === stringTokenizer ? "keyword" : null
+    state.tokenizers.shift();
+    return state.tokenizers[0] === stringTokenizer ? "keyword" : null;
   }
   if (stream.match(/"/)) {
     state.tokenizers.unshift(stringTokenizer);
     return stringTokenizer(stream, state);
   }
+  // TODO - this was cribbed from newt, which allows almost everything in an identifier
   if (stream.match(/[^\\(){}[\],.@;\s][^()\\{}\[\],.@;\s]*/)) {
     let word = stream.current();
     if (keywords.includes(word)) return "keyword";
     if (word[0] >= "A" && word[0] <= "Z") return "typeName";
-    if (word[0] == '%') return "keyword";
+    if (word[0] == "%") return "keyword";
     return "variableName";
   }
-  // unhandled
-  stream.next()
+  // unhandled char
+  stream.next();
   return null;
 }
 
 function stringTokenizer(stream: StringStream, state: State) {
   while (true) {
+    // if we've accumulated text, emit it before starting interpolation
     if (stream.current() && stream.match(/^\\{/, false)) {
       return "string";
     }
     if (stream.match(/^\\{/)) {
-      state.tokenizers.unshift(tokenizer)
+      state.tokenizers.unshift(tokenizer);
       return "keyword";
     }
-    let ch = stream.next()
+    let ch = stream.next();
     if (!ch) return "string";
     if (ch === '"') {
-      state.tokenizers.shift()
+      state.tokenizers.shift();
       return "string";
     }
   }
 }
 
-// We don't need a tokenizer for this until we add nested comments
+// Comments are nested and -- is respected in comments
 function commentTokenizer(stream: StringStream, state: State): string | null {
   console.log("ctok");
-  let dash = false;
-  let ch;
-  while ((ch = stream.next())) {
-    if (dash && ch === "}") {
-      state.tokenizers.shift()
-      return "comment";
+  do {
+    if (stream.match(/^-\}/)) {
+      state.tokenizers.shift();
+      break;
     }
-    dash = ch === "-";
-  }
+    if (stream.match(/--/)) {
+      stream.skipToEnd();
+      break;
+    }
+    if (stream.match(/^\{-/)) {
+      state.tokenizers.unshift(commentTokenizer);
+      break;
+    }
+  } while (stream.next());
   return "comment";
 }
 
@@ -151,17 +159,18 @@ const newtLanguage2 = StreamLanguage.define({
   startState: () => ({ tokenizers: [tokenizer] }),
   token(stream, st) {
     if (!st.tokenizers.length) {
-      console.error('NO TOKENIZER')
-      st.tokenizers.push(tokenizer)
+      console.error("NO TOKENIZER");
+      st.tokenizers.push(tokenizer);
     }
     return st.tokenizers[0](stream, st);
   },
   languageData: {
     commentTokens: {
-      line: "--"
+      line: "--",
     },
+    // Extra chars to pick up operators for type at point
     wordChars: "!#$%^&*_+-=<>|",
-  }
+  },
 });
 
 function newt() {
