@@ -16,11 +16,11 @@ The compiler is run one second after the user stops changing the document.  Ther
 
 | macos | linux / windows  | command |
 | ----- | ---------------- | ------- |
-| M-s   | C-s              | Embed code to url and copy to clipboard |
+| M-s   | C-s   | Embed code to url and copy to clipboard |
 | M-. i | C-. i | Introduce unambiguous constructor in hole |
 | M-. c | C-. c | Case split |
 | M-. s | C-. s | Proof search in hole |
-
+| C-l   | C-l   | Clears the repl, if focused |
 
 ## Running
 

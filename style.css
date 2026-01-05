@@ -1,41 +1,77 @@
+:root {
+  --border-color: #888;
+  --tab-select-color: #555;
+  --text-color: black;
+  --tab-text-color: #555;
+  --bg-color: white;
+}
+body {
+  overflow: hidden;
+  font-size: 12px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
 svg.icon path {
   stroke: black;
   fill: none;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tab-select-color: #eee;
+    --tab-text-color: #aaa;
+    --text-color: white;
+    --bg-color: black;
+    color-scheme: dark;
+  }
+  .tabBody {
+    /* match editor */
+    color: #abb2bf;
+    background-color: #282c34;
+  }
+}
+
+#help {
+  padding: 5px;
+  font-family: 'Comic Code', monospace;
+  overflow: auto;
+  height: 100%;
+}
+
+#help>div {
+  margin: 5px 0;
+}
+/* 
+.toast, .toast div {
+    background: black;
+    color: white;
+  }
+*/
 .toast {
   position: absolute;
   left: 50%;
   top: 50px;
   width: auto;
   z-index: 100;
-  background: white;
+  background: var(--bg-color);
+  color: var(--text-color);
 }
-
 .toast div {
   margin-left: -50%;
   border: solid 2px darkgrey;
   padding: 10px;
   border-radius: 10px;
-  background: white;
   text-align: center;
+  background: var(--bg-color);
+  color: var(--text-color);
 }
 
-@media (prefers-color-scheme: dark) {
-	body {
-    color: white;
-    background-color: black;
-  }
-  svg.icon path {
-    stroke: white;
-    fill: none;
-  }
-  .toast, .toast div {
-    background: black;
-    color: white;
-  }
+#javascript {
+  height: 100%;
 }
-
+.right .tabBody {
+  border-left: solid 1px var(--border-color);
+}
 #app {
   top: 0;
   bottom: 0;
@@ -46,29 +82,34 @@ svg.icon path {
 #editor {
   height: 100%;
 }
-.wrapper.horizontal {
+
+.wrapper {
   display: flex;
   flex-direction: row;
   height: 100%;
 }
-.wrapper.horizontal > div {
-  flex: 1 1;
-  /* allow smaller than natural */
-  width: 100px;
+@media (width >= 1024px) {
+  .wrapper > div {
+    flex: 1 1;
+    /* allow smaller than natural */
+    width: 100px;
+  }
 }
-.wrapper.vertical {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.wrapper.vertical .tabPanel.left {
-  /* designed to go down to the keyboard on my phone */
-  flex: .65 .65;
-  height: 100px;
-}
-.wrapper.vertical .tabPanel.right {
-  flex: .35 .35;
-  height: 100px;
+
+@media (width <=1024px) {
+  .wrapper {
+    flex-direction: column;
+  }
+  .wrapper .tabPanel.left {
+    /* designed to go down to the keyboard on my phone */
+    flex: .65 .65;
+    height: 100px;
+  }
+
+  .wrapper .tabPanel.right {
+    flex: .35 .35;
+    height: 100px;
+  }
 }
 .tabBar button {
   border: none;
@@ -78,13 +119,14 @@ svg.icon path {
 .tabPanel {
   display: flex;
   flex-direction: column;
+  font-family: 'Comic Code', monospace;
 }
 .tabBar {
   display:flex;
   flex-direction: row;
   gap: 10px;
   margin: 10px 0 0 0;
-  border-bottom: solid 1px black;
+  border-bottom: solid 1px var(--border-color);
   height: 30px;
 }
 .tabBar>select {
@@ -92,35 +134,33 @@ svg.icon path {
 }
 .tab {
   padding: 4px;
-  border: solid 1px transparent;
+  border-bottom: solid 2px transparent;
+  color: var(--tab-text-color);
 }
 .tab.selected {
-  border: solid 1px black;
-  border-bottom: 0px
+  border-bottom: solid 2px var(--tab-select-color);
+  color: var(--text-color);
 }
 .tabBody {
   flex: 1 1;
-  height: 10px;
+  height: 0; /* min height */
 }
-.prompt {
-  font-size:14px;
-  padding-right: 3px;
-}
-.clear {
-  border:none;
-  background: inherit;
-}
-
-#result, #javascript, #output, #cases {
+th, td {
   padding: 5px;
-  overflow: auto;
+  text-align: left;
+}
+table {
+  border-collapse: collapse;
+}
+tr:has(th) {
+  border-bottom: solid 2px var(--border-color);
 }
 #result, #javascript, #output, #cases, #repl, .cm-tooltip {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
+  padding: 5px;
 }
-/* Do we want to wrap? */
 #cases {
   white-space: pre-wrap;
 }
@@ -149,6 +189,12 @@ svg.icon path {
 .stretch {
   flex: 1 1;
 }
-.cm-tooltip {
+.tooltip {
   padding: 5px;
+}
+.cm-editor .cm-content {
+  font-family: 'Comic Code', monospace;
+}
+.cm-editor {
+  height: 100%;
 }

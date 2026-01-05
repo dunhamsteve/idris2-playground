@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "outDir": "out",
     "sourceMap": true,
-
+    "allowJs": true,
 
     /* Bundler mode */
     "moduleResolution": "Bundler",

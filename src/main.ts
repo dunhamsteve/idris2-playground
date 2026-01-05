@@ -3,7 +3,11 @@ import { Diagnostic } from "@codemirror/lint";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
-import { archive, preload } from "./preload.ts";
+import helpText from "./help.md?raw";
+import share from "./share.svg";
+import share_light from "./share_light.svg";
+import play from "./play.svg";
+import play_light from "./play_light.svg";
 import { b64decode, b64encode } from "./base64";
 import {
   AbstractEditor,
@@ -16,38 +20,60 @@ import {
 import { CMEditor } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
-// import { IPC } from "./ipc.ts";
 
+function mdline2nodes(s: string) {
+  let cs: (VNode<any> | string)[] = [];
+  let toks = s.matchAll(
+    /\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_|!\[(.*?)\]\((.*?)\)|:(\w+):|[^*]+|\*/g
+  );
+  for (let tok of toks) {
+    (tok[1] && cs.push(h("b", {}, tok[1]))) ||
+      (tok[2] && cs.push(h("em", {}, tok[2]))) ||
+      (tok[3] && cs.push(h("em", {}, tok[0].slice(1, -1)))) ||
+      (tok[5] && cs.push(h("img", { src: tok[5], alt: tok[4] }))) ||
+      (tok[6] && cs.push(h(Icon, { name: tok[6] }))) ||
+      cs.push(tok[0]);
+  }
+  return cs;
+}
 
-// monaco.languages.register({ id: "idris" });
-// monaco.languages.setMonarchTokensProvider("idris", idrisTokens);
-// monaco.languages.setLanguageConfiguration("idris", idrisConfig);
-// monaco.languages.registerHoverProvider("idris", {
-//   provideHover: async (model, pos, token, ctx) => {
-//     // getToken doesn't work because of the parsing in :typeat
-//     const word = model.getWordAtPosition(pos);
-//     if (word) {
-//       let range: monaco.IRange = {
-//         startLineNumber: pos.lineNumber,
-//         startColumn: word.startColumn,
-//         endColumn: word.endColumn,
-//         endLineNumber: pos.lineNumber,
-//       };
-//       // TODO - need to distinguish errors from proper results (both emit text)
-//       let res = await runCommand(
-//         "repl",
-//         `:typeat ${pos.lineNumber} ${word.startColumn} ${word.word}`
-//       );
-//       if (res && !res.startsWith('ERROR')) {
-//         return {
-//           contents: [{ value: "```\n" + res + "\n```" }],
-//           range,
-//         };
-//       }
-//     }
-//     return undefined;
-//   },
-// });
+function md2nodes(md: string) {
+  let rval: VNode[] = [];
+  let list: VNode[] | undefined;
+  let table: VNode[] | undefined;
+  let cell = 'th'
+  for (let line of md.split("\n")) {
+    if (line.startsWith("- ")) {
+      if (!list) {
+        list = [];
+        rval.push(h("ul", {}, list));
+      }
+      list.push(h("li", {}, mdline2nodes(line.slice(2))));
+      continue;
+    }
+    if (line.startsWith("|")) {
+      if (!table) {
+        table = [];
+        cell = 'th';
+        rval.push(h("table",{}, table))
+      }
+      let parts = line.split('|').slice(1)
+      if (parts[0]?.trim().match(/^-+$/)) cell = 'td'
+      else table.push(h("tr", {}, parts.map(t => h(cell,{},md2nodes(t)))))
+      continue
+    }
+    list = undefined;
+    table = undefined;
+    if (line.startsWith("# ")) {
+      rval.push(h("h2", {}, mdline2nodes(line.slice(2))));
+    } else if (line.startsWith("## ")) {
+      rval.push(h("h3", {}, mdline2nodes(line.slice(3))));
+    } else {
+      rval.push(h("div", {}, mdline2nodes(line)));
+    }
+  }
+  return rval;
+}
 
 const iframe = document.createElement("iframe");
 iframe.src = "frame.html";
@@ -103,11 +129,12 @@ function runCommand(cmd: WorkerReq["cmd"], src: string) {
 }
 // make the run thinger update javacript first if empty
 async function runOutput() {
-  if (!state.javascript.value) await updateJavascript()
+  if (!state.javascript.value) await updateJavascript();
   const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
     iframe.contentWindow?.postMessage({ cmd: "exec", src }, "*");
+    // TODO switch tab to Javascript
   } catch (e) {
     console.error(e);
   }
@@ -142,7 +169,6 @@ const state = {
   editor: signal<AbstractEditor | null>(null),
   toast: signal(""),
 };
-window.state = state;
 
 if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
@@ -169,16 +195,18 @@ async function loadFile(fn: string) {
   }
 }
 
+async function copyToClipboard(ev: Event) {
+  ev.preventDefault();
+  let src = state.editor.value!.getValue();
+  let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`;
+  window.location.hash = hash;
+  await navigator.clipboard.writeText(window.location.href);
+  state.toast.value = "URL copied to clipboard";
+  setTimeout(() => (state.toast.value = ""), 2_000);
+}
+
 document.addEventListener("keydown", async (ev) => {
-  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS") {
-    ev.preventDefault();
-    let src = state.editor.value!.getValue();
-    let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`;
-    window.location.hash = hash;
-    await navigator.clipboard.writeText(window.location.href);
-    state.toast.value = "URL copied to clipboard";
-    setTimeout(() => (state.toast.value = ""), 2_000);
-  }
+  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS") copyToClipboard(ev);
 });
 
 function getSavedCode() {
@@ -307,6 +335,10 @@ function Result({ field }: { field: keyof CompileRes }) {
   return h("div", { id: field }, text);
 }
 
+function Help() {
+  return h("div", { id: "help" }, md2nodes(helpText));
+}
+
 function Console() {
   const messages = state.messages.value ?? [];
   return h(
@@ -400,11 +432,14 @@ const OUTPUT = "Output";
 const JAVASCRIPT = "JS Source";
 const CONSOLE = "JS Console";
 const CASES = "Case Trees";
+const HELP = "Help";
 
-let TABS = [OUTPUT, REPL, JAVASCRIPT, CONSOLE]
+let TABS = [OUTPUT, REPL, JAVASCRIPT, CONSOLE, HELP];
 
 function Tabs() {
-  const [selected, setSelected] = useState(TABS.includes(localStorage.tab) ? localStorage.tab : OUTPUT);
+  const [selected, setSelected] = useState(
+    TABS.includes(localStorage.tab) ? localStorage.tab : OUTPUT
+  );
   const Tab = (label: string) => {
     let onClick = () => {
       setSelected(label);
@@ -436,6 +471,9 @@ function Tabs() {
     case OUTPUT:
       body = h(Result, { field: "output" });
       break;
+    case HELP:
+      body = h(Help, {});
+      break;
     default:
       body = h("div", {});
   }
@@ -450,21 +488,28 @@ function Tabs() {
       Tab(REPL),
       Tab(JAVASCRIPT),
       Tab(CONSOLE),
-      // Tab(CASES),
+      Tab(HELP)
     ),
     h("div", { className: "tabBody" }, body)
   );
 }
 
+const icons: Record<string, string> = {
+  "play-dark": play,
+  "play-light": play_light,
+  "share-dark": share,
+  "share-light": share_light,
+};
+
+function Icon({ name }: { name: string }) {
+  let dark = state.dark.value ? "dark" : "light";
+  let src = icons[name + "-" + dark];
+  return h("img", { src });
+}
+
 const SAMPLES = ["Main.idr", "BTree.idr", "Interp.idr"];
 
-function EditWrap({
-  vertical,
-  toggle,
-}: {
-  vertical: boolean;
-  toggle: () => void;
-}) {
+function EditWrap() {
   const options = SAMPLES.map((value) => h("option", { value }, value));
 
   const onChange = async (ev: ChangeEvent) => {
@@ -474,12 +519,6 @@ function EditWrap({
       loadFile(fn);
     }
   };
-  // let play = "M0 0 L20 10 L0 20 z";
-  let svg = (d: string) =>
-    h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
-  let d = vertical
-    ? "M0 0 h20 v20 h-20 z M0 10 h20"
-    : "M0 0 h20 v20 h-20 z M10 0 v20";
   return h(
     "div",
     { className: "tabPanel left" },
@@ -493,9 +532,16 @@ function EditWrap({
         options
       ),
       h("div", { style: { flex: "1 1" } }),
-      // h("button", { onClick: runOutput }, svg(play)),
-      h("button", { onClick: runOutput, title: 'run output' }, "▶"),
-      h("button", { onClick: toggle }, svg(d))
+      h(
+        "button",
+        { onClick: copyToClipboard, title: "share" },
+        Icon({ name: "share" })
+      ),
+      h(
+        "button",
+        { onClick: runOutput, title: "run output" },
+        Icon({ name: "play" })
+      ),
     ),
     h(
       "div",
