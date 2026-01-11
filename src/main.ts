@@ -219,6 +219,13 @@ function getSavedCode() {
       console.error(e);
     }
   }
+  if (hash.startsWith('#code=')) {
+    try {
+      value = decodeURIComponent(hash.slice(6))
+    } catch (e) {
+      console.error(e);
+    }
+  }
   return value;
 }
 
