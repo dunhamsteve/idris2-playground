@@ -4,15 +4,10 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 import helpText from "./help.md?raw";
-import share from "./share.svg";
-import share_light from "./share_light.svg";
-import play from "./play.svg";
-import play_light from "./play_light.svg";
 import { b64decode, b64encode } from "./base64";
 import {
   AbstractEditor,
   EditorDelegate,
-  TopData,
   Marker,
   WorkerReq,
   CompileRes,
@@ -501,17 +496,8 @@ function Tabs() {
   );
 }
 
-const icons: Record<string, string> = {
-  "play-dark": play,
-  "play-light": play_light,
-  "share-dark": share,
-  "share-light": share_light,
-};
-
-function Icon({ name }: { name: string }) {
-  let dark = state.dark.value ? "dark" : "light";
-  let src = icons[name + "-" + dark];
-  return h("img", { src });
+function Icon({name}: {name: string}) {
+  return h('svg', {'class':'icon'}, h('use', {href:`#${name}`}))
 }
 
 const SAMPLES = ["Main.idr", "BTree.idr", "Interp.idr"];
@@ -538,6 +524,7 @@ function EditWrap() {
         h("option", { value: "" }, "load sample"),
         options
       ),
+      h("a", {href: 'https://github.com/dunhamsteve/idris2-playground', title: 'github', target:'_blank'}, Icon({name: "github"})),
       h("div", { style: { flex: "1 1" } }),
       h(
         "button",
