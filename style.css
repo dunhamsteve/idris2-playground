@@ -72,6 +72,7 @@ svg.icon path {
 
 #javascript {
   height: 100%;
+  overflow: auto;
 }
 .right .tabBody {
   border-left: solid 1px var(--border-color);
